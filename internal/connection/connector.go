@@ -3,8 +3,6 @@ package connection
 import (
 	"log"
 	"math/rand/v2"
-	"os"
-	"os/signal"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -15,9 +13,12 @@ type Connection struct {
 	endpoint string
 }
 
-func connector(endpoint string, dataChan chan<- []byte) {
+type MessageResponse struct {
+	message []byte
+	err     error
+}
 
-	log.Printf("Connecting to %s...", endpoint)
+func Connector(endpoint string, dataChan chan<- []byte) {
 
 	conn := Connection{endpoint: endpoint}
 	dialErr := conn.dial()
@@ -25,15 +26,6 @@ func connector(endpoint string, dataChan chan<- []byte) {
 		log.Fatal("Dial error:", dialErr)
 	}
 	defer conn.conn.Close()
-
-	// Handle OS interrupt signals (Ctrl+C)
-	interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, os.Interrupt)
-
-	type MessageResponse struct {
-		message []byte
-		err     error
-	}
 
 	cb := CircuitBreaker{Closed, 9, 20, 0, 0, true}
 	resp := MessageResponse{[]byte{}, nil}
