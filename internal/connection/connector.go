@@ -2,8 +2,10 @@ package connection
 
 import (
 	"log"
+	"math/rand/v2"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -13,11 +15,11 @@ type Connection struct {
 	endpoint string
 }
 
-func connector(endpoint string) {
+func connector(endpoint string, dataChan chan<- []byte) {
 
 	log.Printf("Connecting to %s...", endpoint)
 
-	conn := Connection{new(websocket.Conn), endpoint}
+	conn := Connection{endpoint: endpoint}
 	dialErr := conn.dial()
 	if dialErr != nil {
 		log.Fatal("Dial error:", dialErr)
@@ -36,26 +38,34 @@ func connector(endpoint string) {
 	cb := CircuitBreaker{Closed, 9, 20, 0, 0, true}
 	resp := MessageResponse{[]byte{}, nil}
 	for {
-		cb.waitForPermission(conn.conn)
 
-		// if conn == nil {
-		// 	conn, _, dialErr = dial(endpoint)
-		// 	if dialErr != nil {
-		// 		cb.incrementFails()
-		// 		continue
-		// 	}
-		// }
+		if cb.requestPermission() {
+			_, resp.message, resp.err = conn.conn.ReadMessage()
 
-		_, resp.message, resp.err = conn.ReadMessage()
+			dataChan <- resp.message
 
-		if resp.err != nil {
-			cb.incrementFails()
-			// conn.Close() // Clean up the dead socket
-			// conn = nil   // Trigger a re-dial on next loop
-			// continue
+			if resp.err != nil {
+				cb.incrementFails()
+			} else {
+				cb.incrementSuccesses()
+			}
+		} else {
+			maxWait := 60000
+			baseWait := 1000
+			for baseWait > 0 {
+				waitTime := rand.Float64() * float64(baseWait)
+				time.Sleep(time.Duration(waitTime) * time.Millisecond)
+				dialErr = conn.dial()
+				cb.setDialState(dialErr)
+				if cb.requestPermission() {
+					break
+				}
+				if baseWait < maxWait {
+					baseWait *= 2
+				}
+			}
 		}
 
-		// dataChan <- message
 	}
 
 }
