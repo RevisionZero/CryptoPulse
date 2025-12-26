@@ -37,15 +37,14 @@ import (
 // }
 
 func main() {
-	streams := "btcusdt@bookTicker/ethusdt@bookTicker"
-	endpoint := fmt.Sprintf("wss://fstream.binance.com/stream?streams=%s", streams)
+	symbols := []string{"btcusdt", "ethusdt"}
 	dataChan := make(chan []byte, 100)
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
 	// Start connector in goroutine
-	go connection.Connector(endpoint, dataChan)
+	go connection.Connector(symbols, dataChan)
 
 	// Read and print messages
 	for {
