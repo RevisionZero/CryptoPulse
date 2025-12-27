@@ -1,9 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"main/internal/connection"
+	"main/internal/engine"
 	"os"
 	"os/signal"
 	"time"
@@ -46,11 +46,13 @@ func main() {
 	// Start connector in goroutine
 	go connection.Connector(symbols, dataChan)
 
+	go engine.Synchronizer(symbols, dataChan)
+
 	// Read and print messages
 	for {
 		select {
-		case msg := <-dataChan:
-			fmt.Printf("Received: %s\n", string(msg))
+		// case msg := <-dataChan:
+		// 	fmt.Printf("Received: %s\n", string(msg))
 		case <-interrupt:
 			log.Println("Interrupt received, closing connection...")
 			return
