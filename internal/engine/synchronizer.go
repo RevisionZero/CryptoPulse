@@ -4,23 +4,33 @@ import (
 	"encoding/json"
 	"log"
 	"main/pkg/models"
+	"maps"
 	"strconv"
+	"sync"
 	"time"
 )
 
 func Synchronizer(symbols []string, dataStream <-chan []byte) {
-	var latestPrices map[string]chan float64
+	latestPrices := make(map[string]float64)
+
+	const slidingWindowSize = 600
+
+	slidingWindows := make(map[string]*models.RingBuffer)
+
+	sampledDataChan := make(chan map[string][]float64, 100)
+
 	for _, symbol := range symbols {
-		latestPrices[symbol] = make(chan float64)
+		slidingWindows[symbol] = models.NewRingBuffer(slidingWindowSize)
 	}
 
-	// Start the sampler
-	go PriceUpdater(latestPrices, dataStream)
+	var lock sync.RWMutex
 
-	go Sampler(symbols, latestPrices)
+	go PriceUpdater(latestPrices, dataStream, &lock)
+
+	go Sampler(symbols, latestPrices, &lock, slidingWindows, sampledDataChan)
 }
 
-func PriceUpdater(latestPrices map[string]chan float64, dataStream <-chan []byte) {
+func PriceUpdater(latestPrices map[string]float64, dataStream <-chan []byte, lock *sync.RWMutex) {
 
 	// var latestValues map[string]chan float64
 	// for _, symbol := range symbols {
@@ -56,16 +66,28 @@ func PriceUpdater(latestPrices map[string]chan float64, dataStream <-chan []byte
 			continue
 		}
 
-		latestPrices[envelope.Data.Symbol] <- (bid + ask) / 2
+		lock.Lock()
+		latestPrices[envelope.Data.Symbol] = (bid + ask) / 2
+		lock.Unlock()
 
 	}
 }
 
-func Sampler(symbols []string, latestPrices map[string]chan float64) {
+func Sampler(symbols []string, latestPrices map[string]float64, lock *sync.RWMutex, slidingWindows map[string]*models.RingBuffer, sampledDataChan chan<- map[string][]float64) {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		// Sampling logic here
+		lock.RLock()
+		sample := maps.Clone(latestPrices)
+		sampledData := make(map[string][]float64)
+		for _, symbol := range symbols {
+			slidingWindows[symbol].Add(sample[symbol])
+			sampledData[symbol] = slidingWindows[symbol].GetAll()
+		}
+		sampledDataChan <- sampledData
+
+		lock.RUnlock()
+
 	}
 }
