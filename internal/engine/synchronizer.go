@@ -13,11 +13,11 @@ import (
 func Synchronizer(symbols []string, dataStream <-chan []byte) {
 	latestPrices := make(map[string]float64)
 
-	const slidingWindowSize = 600
+	const slidingWindowSize = 10
 
 	slidingWindows := make(map[string]*models.RingBuffer)
 
-	sampledDataChan := make(chan map[string][]float64, 100)
+	sampledDataChan := make(chan map[string][]float64, 1)
 
 	for _, symbol := range symbols {
 		slidingWindows[symbol] = models.NewRingBuffer(slidingWindowSize)
@@ -28,14 +28,12 @@ func Synchronizer(symbols []string, dataStream <-chan []byte) {
 	go PriceUpdater(latestPrices, dataStream, &lock)
 
 	go Sampler(symbols, latestPrices, &lock, slidingWindows, sampledDataChan)
+
+	go PCCMatrixCalculator(sampledDataChan, symbols)
 }
 
 func PriceUpdater(latestPrices map[string]float64, dataStream <-chan []byte, lock *sync.RWMutex) {
 
-	// var latestValues map[string]chan float64
-	// for _, symbol := range symbols {
-	// 	latestValues[symbol] = make(chan float64)
-	// }
 	for {
 		rawData := <-dataStream
 		var envelope models.CombinedStream
@@ -46,13 +44,6 @@ func PriceUpdater(latestPrices map[string]float64, dataStream <-chan []byte, loc
 			log.Printf("Raw JSON: %s", string(rawData))
 			continue
 		}
-
-		// log.Printf("Symbol: %s, Best Bid: %s, Best Ask: %s, Transaction Time: %d, Event Time: %d\n\n\n",
-		// 	envelope.Data.Symbol,
-		// 	envelope.Data.BestBid,
-		// 	envelope.Data.BestAsk,
-		// 	envelope.Data.TransTime,
-		// 	envelope.Data.EventTime)
 
 		bid, err := strconv.ParseFloat(envelope.Data.BestBid, 64)
 		if err != nil {
@@ -79,12 +70,17 @@ func Sampler(symbols []string, latestPrices map[string]float64, lock *sync.RWMut
 
 	for range ticker.C {
 		lock.RLock()
+		if len(latestPrices) == 0 {
+			lock.RUnlock()
+			continue
+		}
 		sample := maps.Clone(latestPrices)
 		sampledData := make(map[string][]float64)
 		for _, symbol := range symbols {
 			slidingWindows[symbol].Add(sample[symbol])
 			sampledData[symbol] = slidingWindows[symbol].GetAll()
 		}
+
 		sampledDataChan <- sampledData
 
 		lock.RUnlock()
