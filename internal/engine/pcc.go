@@ -5,9 +5,18 @@ import (
 )
 
 func PCCMatrixCalculator(sampledDataChan <-chan map[string][]float64, symbols []string) {
+	pccMatrix := make(map[string]map[string]float64, len(symbols))
+	for _, symbolX := range symbols {
+		pccMatrix[symbolX] = make(map[string]float64, len(symbols))
+		for _, symbolY := range symbols {
+			if symbolX == symbolY {
+				pccMatrix[symbolX][symbolY] = 1.0
+			}
+		}
+	}
 	for {
 		sampledData := <-sampledDataChan
-		pccMatrix := CalculatePCCMatrix(sampledData, symbols)
+		CalculatePCCMatrix(sampledData, symbols, pccMatrix)
 		_ = pccMatrix
 		// log.Printf("PCC Matrix: %+v\n", pccMatrix)
 
@@ -38,11 +47,9 @@ func PCC(x []float64, y []float64, sampleSize int) float64 {
 	return sumOfProducts / math.Sqrt(diffOfSquaresX*diffOfSquaresY)
 }
 
-func CalculatePCCMatrix(sampledData map[string][]float64, symbols []string) map[string]map[string]float64 {
-	pccMatrix := make(map[string]map[string]float64)
+func CalculatePCCMatrix(sampledData map[string][]float64, symbols []string, pccMatrix map[string]map[string]float64) {
 
 	for _, symbolX := range symbols {
-		pccMatrix[symbolX] = make(map[string]float64)
 		for _, symbolY := range symbols {
 			if symbolX == symbolY {
 				pccMatrix[symbolX][symbolY] = 1.0
@@ -52,5 +59,5 @@ func CalculatePCCMatrix(sampledData map[string][]float64, symbols []string) map[
 			}
 		}
 	}
-	return pccMatrix
+
 }

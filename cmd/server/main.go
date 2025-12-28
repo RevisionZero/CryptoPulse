@@ -10,7 +10,9 @@ import (
 
 func main() {
 	symbols := []string{"BTCUSDT", "ETHUSDT"}
-	dataChan := make(chan []byte, 100)
+
+	const channelCapacity = 100
+	dataChan := make(chan []byte, channelCapacity)
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)

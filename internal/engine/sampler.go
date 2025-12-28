@@ -20,6 +20,7 @@ func Sampler(symbols []string, latestPrices map[string]float64, lock *sync.RWMut
 			continue
 		}
 		sample := maps.Clone(latestPrices)
+		lock.RUnlock()
 		sampledData := make(map[string][]float64)
 		for _, symbol := range symbols {
 			slidingWindows[symbol].Add(sample[symbol])
@@ -27,8 +28,6 @@ func Sampler(symbols []string, latestPrices map[string]float64, lock *sync.RWMut
 		}
 
 		sampledDataChan <- sampledData
-
-		lock.RUnlock()
 
 	}
 }

@@ -12,7 +12,8 @@ func Synchronizer(symbols []string, dataStream <-chan []byte) {
 
 	slidingWindows := make(map[string]*models.RingBuffer)
 
-	sampledDataChan := make(chan map[string][]float64, 1)
+	const channelCapacity = 2
+	sampledDataChan := make(chan map[string][]float64, channelCapacity)
 
 	for _, symbol := range symbols {
 		slidingWindows[symbol] = models.NewRingBuffer(slidingWindowSize)
