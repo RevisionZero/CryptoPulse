@@ -1,7 +1,7 @@
 package engine
 
 import (
-	"main/pkg/models"
+	"main/pkg/utils"
 	"sync"
 )
 
@@ -10,13 +10,13 @@ const slidingWindowSize = 600
 func Synchronizer(symbols []string, dataStream <-chan []byte) {
 	latestPrices := make(map[string]float64)
 
-	slidingWindows := make(map[string]*models.RingBuffer)
+	slidingWindows := make(map[string]*utils.RingBuffer)
 
 	const channelCapacity = 2
 	sampledDataChan := make(chan map[string][]float64, channelCapacity)
 
 	for _, symbol := range symbols {
-		slidingWindows[symbol] = models.NewRingBuffer(slidingWindowSize)
+		slidingWindows[symbol] = utils.NewRingBuffer(slidingWindowSize)
 	}
 
 	var lock sync.RWMutex

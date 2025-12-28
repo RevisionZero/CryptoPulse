@@ -1,7 +1,7 @@
 package engine
 
 import (
-	"main/pkg/models"
+	"main/pkg/utils"
 	"maps"
 	"sync"
 	"time"
@@ -9,7 +9,7 @@ import (
 
 const samplingPeriod = 100 * time.Millisecond
 
-func Sampler(symbols []string, latestPrices map[string]float64, lock *sync.RWMutex, slidingWindows map[string]*models.RingBuffer, sampledDataChan chan<- map[string][]float64) {
+func Sampler(symbols []string, latestPrices map[string]float64, lock *sync.RWMutex, slidingWindows map[string]*utils.RingBuffer, sampledDataChan chan<- map[string][]float64) {
 	ticker := time.NewTicker(samplingPeriod)
 	defer ticker.Stop()
 
