@@ -16,6 +16,11 @@ type BinanceTicker struct {
 	EventTime int64  `json:"E"`
 }
 
+type PriceMutation struct {
+	NewPrices map[string]float64
+	OldPrices map[string]float64
+}
+
 type RingBuffer struct {
 	data  []float64
 	index int
@@ -29,9 +34,11 @@ func NewRingBuffer(size int) *RingBuffer {
 	}
 }
 
-func (rb *RingBuffer) Add(value float64) {
+func (rb *RingBuffer) Add(value float64) float64 {
+	oldVal := rb.data[rb.index]
 	rb.data[rb.index] = value
 	rb.index = (rb.index + 1) % rb.size
+	return oldVal
 }
 
 func (rb *RingBuffer) GetAll() []float64 {
