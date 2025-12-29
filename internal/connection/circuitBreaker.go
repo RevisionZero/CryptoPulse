@@ -78,27 +78,4 @@ func (cb *CircuitBreaker) requestPermission() bool {
 	} else {
 		return false
 	}
-
-	// } else {
-	// 	cb.failCount = 0
-	// 	cb.successCount = 0
-
-	// 	maxWait := 60000
-	// 	baseWait := 1000
-	// 	for baseWait > 0 {
-	// 		waitTime := rand.Float64() * float64(baseWait)
-	// 		time.Sleep(time.Duration(waitTime) * time.Millisecond)
-	// 		dialErr := error(nil)
-	// 		dialErr = conn.dial()
-	// 		if dialErr == nil {
-	// 			cb.dialSuccess = true
-	// 			cb.updateState()
-	// 		} else {
-	// 			cb.dialSuccess = false
-	// 		}
-	// 		if baseWait < maxWait {
-	// 			baseWait *= 2
-	// 		}
-	// 	}
-	// }
 }

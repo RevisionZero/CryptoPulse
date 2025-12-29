@@ -18,8 +18,9 @@ type MessageResponse struct {
 	err     error
 }
 
-func Connector(endpoint string, dataChan chan<- []byte) {
+func Connector(symbols []string, dataChan chan<- []byte) {
 
+	endpoint := constructBinanceEndpoint(symbols)
 	conn := Connection{endpoint: endpoint}
 	dialErr := conn.dial()
 	if dialErr != nil {
