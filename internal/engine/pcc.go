@@ -32,7 +32,7 @@ func PCC(x []float64, y []float64, sampleSize int) float64 {
 	meanX := 0.0
 	meanY := 0.0
 
-	for i, _ := range x {
+	for i := range x {
 		oldMeanX := meanX
 		oldMeanY := meanY
 
