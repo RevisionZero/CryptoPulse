@@ -17,7 +17,6 @@ func PCCMatrixCalculator(sampledDataChan <-chan map[string][]float64, symbols []
 	for {
 		sampledData := <-sampledDataChan
 		CalculatePCCMatrix(sampledData, symbols, pccMatrix)
-		_ = pccMatrix
 		// log.Printf("PCC Matrix: %+v\n", pccMatrix)
 
 	}
