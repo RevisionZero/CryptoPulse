@@ -22,17 +22,12 @@ func main() {
 
 	go engine.Synchronizer(symbols, dataChan)
 
-	// Read and print messages
+	// Wait for interrupt signal
 	for {
 		select {
-		// case msg := <-dataChan:
-		// 	fmt.Printf("Received: %s\n", string(msg))
 		case <-interrupt:
 			log.Println("Interrupt received, closing connection...")
 			return
-			// case <-time.After(10 * time.Second):
-			// 	log.Println("Test finished.")
-			// 	return
 		}
 	}
 }
