@@ -43,7 +43,12 @@ func PCC(x []float64, y []float64, sampleSize int) float64 {
 		diffOfSquaresX = diffOfSquaresX + (x[i]-meanX)*(x[i]-oldMeanX)
 		diffOfSquaresY = diffOfSquaresY + (y[i]-meanY)*(y[i]-oldMeanY)
 	}
-	return sumOfProducts / math.Sqrt(diffOfSquaresX*diffOfSquaresY)
+	
+	result := sumOfProducts / math.Sqrt(diffOfSquaresX*diffOfSquaresY)
+	if math.IsNaN(result) {
+		return 0.0
+	}
+	return result
 }
 
 func CalculatePCCMatrix(sampledData map[string][]float64, symbols []string, pccMatrix map[string]map[string]float64) {
