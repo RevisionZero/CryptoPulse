@@ -23,8 +23,16 @@ func Sampler(symbols []string, latestPrices map[string]float64, lock *sync.RWMut
 		lock.RUnlock()
 		sampledData := make(map[string][]float64)
 		for _, symbol := range symbols {
-			slidingWindows[symbol].Add(sample[symbol])
-			sampledData[symbol] = slidingWindows[symbol].GetAll()
+			price, ok := sample[symbol]
+			if !ok {
+				continue
+			}
+			window, ok := slidingWindows[symbol]
+			if !ok || window == nil {
+				continue
+			}
+			window.Add(price)
+			sampledData[symbol] = window.GetAll()
 		}
 
 		sampledDataChan <- sampledData
