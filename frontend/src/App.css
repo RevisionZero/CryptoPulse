@@ -5,38 +5,73 @@
   text-align: center;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.app-container {
+  padding: 20px;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.app-container h1 {
+  margin-bottom: 30px;
+  color: #646cff;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.table-container {
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+  margin-top: 20px;
 }
 
-.card {
-  padding: 2em;
+.correlation-table {
+  border-collapse: collapse;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: white;
+  color: #333;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
-.read-the-docs {
-  color: #888;
+.correlation-table th,
+.correlation-table td {
+  padding: 12px 16px;
+  text-align: center;
+  border: 1px solid #e0e0e0;
+  min-width: 100px;
 }
+
+.correlation-table thead th {
+  background: #646cff;
+  color: white;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.correlation-table tbody th {
+  background: #646cff;
+  color: white;
+  font-weight: 600;
+  position: sticky;
+  left: 0;
+  z-index: 5;
+}
+
+.correlation-table td {
+  font-family: monospace;
+  font-size: 14px;
+  transition: background-color 0.3s ease;
+}
+
+.correlation-table td.diagonal {
+  font-weight: bold;
+  background: #f0f0f0 !important;
+}
+
+.correlation-table tbody tr:hover td {
+  background-color: rgba(100, 108, 255, 0.1) !important;
+}
+
+.correlation-table tbody tr:hover td.diagonal {
+  background-color: #e0e0e0 !important;
+}
+

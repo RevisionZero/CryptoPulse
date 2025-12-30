@@ -1,27 +1,39 @@
 import { useEffect, useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import './App.css'
 
-function App() {
+type CorrelationMatrix = {
+  [symbol: string]: {
+    [symbol: string]: number;
+  };
+};
 
+function App() {
     const [ws, setWs] = useState<WebSocket | null>(null);
-    const [messages, setMessages] = useState<string[]>([]);
+    const [correlationMatrix, setCorrelationMatrix] = useState<CorrelationMatrix>({});
+    const [symbols, setSymbols] = useState<string[]>([]);
 
     useEffect(() => {
       // Create WebSocket connection
-      const socket = new WebSocket('ws://localhost:8080');
+      const socket = new WebSocket('ws://localhost:8080/ws');
 
       // Connection opened
       socket.addEventListener('open', (event) => {
         console.log('Connected to WebSocket');
-        socket.send('Hello Server!');
       });
 
       // Listen for messages
       socket.addEventListener('message', (event) => {
-        console.log('Message from server:', event.data);
-        setMessages(prev => [...prev, event.data]);
+        console.log('Message from server ', event.data);
+        try {
+          const data: CorrelationMatrix = JSON.parse(event.data);
+          setCorrelationMatrix(data);
+          
+          // Extract unique symbols from the matrix
+          const symbolList = Object.keys(data);
+          setSymbols(symbolList);
+        } catch (error) {
+          console.error('Error parsing WebSocket data:', error);
+        }
       });
 
       // Handle errors
@@ -43,11 +55,51 @@ function App() {
     }, []);
 
   return (
-    <>
-      <div>
-
-      </div>
-    </>
+    <div className="app-container">
+      <h1>NexusCorr - Correlation Matrix</h1>
+      
+      {symbols.length > 0 ? (
+        <div className="table-container">
+          <table className="correlation-table">
+            <thead>
+              <tr>
+                <th></th>
+                {symbols.map(symbol => (
+                  <th key={symbol}>{symbol}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {symbols.map(rowSymbol => (
+                <tr key={rowSymbol}>
+                  <th>{rowSymbol}</th>
+                  {symbols.map(colSymbol => {
+                    const value = correlationMatrix[rowSymbol]?.[colSymbol];
+                    const displayValue = value !== undefined ? value.toFixed(4) : '-';
+                    
+                    return (
+                      <td 
+                        key={colSymbol}
+                        className={rowSymbol === colSymbol ? 'diagonal' : ''}
+                        style={{
+                          backgroundColor: value !== undefined 
+                            ? `rgba(${value >= 0 ? '0, 255, 0' : '255, 0, 0'}, ${Math.abs(value) * 0.3})`
+                            : 'transparent'
+                        }}
+                      >
+                        {displayValue}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p>Waiting for data...</p>
+      )}
+    </div>
   )
 }
 

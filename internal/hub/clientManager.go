@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"encoding/json"
 	"log"
 	"sync"
 
@@ -10,13 +11,13 @@ import (
 type ClientManager struct {
 	clients   map[*websocket.Conn]bool
 	mu        sync.Mutex
-	broadcast chan []byte
+	broadcast chan map[string]map[string]float64
 }
 
 func NewClientManager() *ClientManager {
 	return &ClientManager{
 		clients:   make(map[*websocket.Conn]bool),
-		broadcast: make(chan []byte, 256),
+		broadcast: make(chan map[string]map[string]float64, 256),
 	}
 }
 
@@ -37,20 +38,27 @@ func (cm *ClientManager) RemoveClient(conn *websocket.Conn) {
 	}
 }
 
-func (cm *ClientManager) Broadcast(message []byte) {
+func (cm *ClientManager) Broadcast(message map[string]map[string]float64) {
 	cm.broadcast <- message
 }
 
-func (cm *ClientManager) GetBroadcastChannel() chan []byte {
+func (cm *ClientManager) GetBroadcastChannel() chan map[string]map[string]float64 {
 	return cm.broadcast
 }
 
-func (cm *ClientManager) SendToAll(message []byte) {
+func (cm *ClientManager) SendToAll(message map[string]map[string]float64) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
+	// Convert map to JSON bytes
+	jsonData, err := json.Marshal(message)
+	if err != nil {
+		log.Printf("Error marshaling message: %v", err)
+		return
+	}
+
 	for client := range cm.clients {
-		err := client.WriteMessage(websocket.TextMessage, message)
+		err := client.WriteMessage(websocket.TextMessage, jsonData)
 		if err != nil {
 			log.Printf("Error sending to client: %v", err)
 			client.Close()

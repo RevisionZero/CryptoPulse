@@ -7,7 +7,7 @@ import (
 
 const slidingWindowSize = 600
 
-func Synchronizer(symbols []string, dataStream <-chan []byte) {
+func Synchronizer(symbols []string, dataStream <-chan []byte, matrixChan chan<- map[string]map[string]float64) {
 	latestPrices := make(map[string]float64)
 
 	slidingWindows := make(map[string]*utils.RingBuffer)
@@ -25,5 +25,5 @@ func Synchronizer(symbols []string, dataStream <-chan []byte) {
 
 	go Sampler(symbols, latestPrices, &lock, slidingWindows, sampledDataChan)
 
-	go PCCMatrixCalculator(sampledDataChan, symbols)
+	go PCCMatrixCalculator(sampledDataChan, symbols, matrixChan)
 }

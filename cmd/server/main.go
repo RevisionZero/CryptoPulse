@@ -15,6 +15,7 @@ func main() {
 
 	const channelCapacity = 100
 	dataChan := make(chan []byte, channelCapacity)
+	matrixChan := make(chan map[string]map[string]float64, 1)
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
@@ -37,12 +38,12 @@ func main() {
 	// Start connector in goroutine
 	go connection.Connector(symbols, dataChan)
 
-	go engine.Synchronizer(symbols, dataChan)
+	go engine.Synchronizer(symbols, dataChan, matrixChan)
 
 	// Read and broadcast messages
 	for {
 		select {
-		case msg := <-dataChan:
+		case msg := <-matrixChan:
 			clientManager.Broadcast(msg)
 		case <-interrupt:
 			log.Println("Interrupt received, closing connection...")
