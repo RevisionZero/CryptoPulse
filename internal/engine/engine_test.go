@@ -29,32 +29,3 @@ func Test_Engine(t *testing.T) {
 	// 3. Instead of connecting to Binance, feed your known signal
 	FeedKnownSignal(dataStream)
 }
-
-// func Test_Engine() {
-// 	symbols := []string{"BTCUSDT", "ETHUSDT"}
-
-// 	const channelCapacity = 100
-// 	dataChan := make(chan []byte, channelCapacity)
-
-// 	interrupt := make(chan os.Signal, 1)
-// 	signal.Notify(interrupt, os.Interrupt)
-
-// 	// Start connector in goroutine
-// 	go connection.Connector(symbols, dataChan)
-
-// 	go Synchronizer(symbols, dataChan)
-
-// 	// Read and print messages
-// 	for {
-// 		select {
-// 		// case msg := <-dataChan:
-// 		// 	fmt.Printf("Received: %s\n", string(msg))
-// 		case <-interrupt:
-// 			log.Println("Interrupt received, closing connection...")
-// 			return
-// 			// case <-time.After(10 * time.Second):
-// 			// 	log.Println("Test finished.")
-// 			// 	return
-// 		}
-// 	}
-// }
