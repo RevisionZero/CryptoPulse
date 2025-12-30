@@ -4,6 +4,8 @@ import (
 	"log"
 	"main/internal/connection"
 	"main/internal/engine"
+	"main/internal/hub"
+	"net/http"
 	"os"
 	"os/signal"
 )
@@ -17,22 +19,34 @@ func main() {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
+	// Create client manager
+	clientManager := hub.NewClientManager()
+
+	// Start broadcaster goroutine
+	go clientManager.Broadcaster()
+
+	// Start HTTP server
+	http.HandleFunc("/ws", clientManager.WSHandler)
+	go func() {
+		log.Println("WebSocket server starting on :8080")
+		if err := http.ListenAndServe(":8080", nil); err != nil {
+			log.Fatalf("HTTP server error: %v", err)
+		}
+	}()
+
 	// Start connector in goroutine
 	go connection.Connector(symbols, dataChan)
 
 	go engine.Synchronizer(symbols, dataChan)
 
-	// Read and print messages
+	// Read and broadcast messages
 	for {
 		select {
-		// case msg := <-dataChan:
-		// 	fmt.Printf("Received: %s\n", string(msg))
+		case msg := <-dataChan:
+			clientManager.Broadcast(msg)
 		case <-interrupt:
 			log.Println("Interrupt received, closing connection...")
 			return
-			// case <-time.After(10 * time.Second):
-			// 	log.Println("Test finished.")
-			// 	return
 		}
 	}
 }
