@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-func PriceUpdater(latestPrices map[string]float64, dataStream <-chan []byte, lock *sync.RWMutex) {
+func PriceUpdater(symbols map[string]*models.SymbolAttributes, dataStream <-chan []byte, lock *sync.RWMutex) {
 
 	for {
 		rawData := <-dataStream
@@ -34,7 +34,7 @@ func PriceUpdater(latestPrices map[string]float64, dataStream <-chan []byte, loc
 		}
 
 		lock.Lock()
-		latestPrices[envelope.Data.Symbol] = (bid + ask) / 2
+		symbols[envelope.Data.Symbol].LatestPrice = (bid + ask) / 2
 		lock.Unlock()
 
 	}

@@ -3,6 +3,7 @@ package hub
 import (
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/websocket"
 )
@@ -15,7 +16,7 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-func (cm *ClientManager) WSHandler(w http.ResponseWriter, r *http.Request) {
+func (hub *Hub) WSHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("WebSocket upgrade error: %v", err)
@@ -23,19 +24,28 @@ func (cm *ClientManager) WSHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Register client
-	cm.AddClient(conn)
+	hub.AddClient(conn)
 
 	// Cleanup on disconnect
-	defer cm.RemoveClient(conn)
+	defer hub.RemoveClient(conn)
 
 	// Keep connection alive - read messages from client
 	for {
-		_, _, err := conn.ReadMessage()
+		_, msg, err := conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("WebSocket error: %v", err)
 			}
 			break
 		}
+
+		log.Printf("Received message from client: %s", msg)
+
+		hub.mu.Lock()
+		hub.symbolReqs <- SymbolRequest{
+			Client:  hub.clients[conn],
+			Symbols: strings.Split(string(msg), ","),
+		}
+		hub.mu.Unlock()
 	}
 }

@@ -11,6 +11,9 @@ function App() {
     const [ws, setWs] = useState<WebSocket | null>(null);
     const [correlationMatrix, setCorrelationMatrix] = useState<CorrelationMatrix>({});
     const [symbols, setSymbols] = useState<string[]>([]);
+    const [tickerInputs, setTickerInputs] = useState<string[]>(['', '', '', '', '']);
+    const [validationErrors, setValidationErrors] = useState<string[]>(['', '', '', '', '']);
+    const [isValidating, setIsValidating] = useState(false);
 
     useEffect(() => {
       // Create WebSocket connection
@@ -54,9 +57,99 @@ function App() {
       };
     }, []);
 
+  const handleTickerChange = (index: number, value: string) => {
+    const newInputs = [...tickerInputs];
+    newInputs[index] = value.toUpperCase();
+    setTickerInputs(newInputs);
+    
+    // Clear validation error when user types
+    const newErrors = [...validationErrors];
+    newErrors[index] = '';
+    setValidationErrors(newErrors);
+  };
+
+  const validateTicker = async (ticker: string): Promise<boolean> => {
+    if (!ticker) return true; // Empty is valid (optional field)
+    
+    try {
+      const response = await fetch(`https://api.binance.com/api/v3/exchangeInfo?symbol=${ticker}`);
+      if (response.ok) {
+        return true;
+      }
+      return false;
+    } catch (error) {
+      return false;
+    }
+  };
+
+  const handleValidateAndSubmit = async () => {
+    // Filter out empty tickers
+    const nonEmptyTickers = tickerInputs.filter(t => t.trim() !== '');
+    
+    // Check minimum 2 tickers
+    if (nonEmptyTickers.length < 2) {
+      alert('Please enter at least 2 tickers');
+      return;
+    }
+
+    setIsValidating(true);
+    const newErrors = ['', '', '', '', ''];
+    let hasError = false;
+
+    // Validate each non-empty ticker
+    for (let i = 0; i < tickerInputs.length; i++) {
+      const ticker = tickerInputs[i].trim();
+      if (ticker) {
+        const isValid = await validateTicker(ticker);
+        if (!isValid) {
+          newErrors[i] = 'Invalid ticker';
+          hasError = true;
+        }
+      }
+    }
+
+    setValidationErrors(newErrors);
+    setIsValidating(false);
+
+    if (!hasError) {
+      console.log('Valid tickers:', nonEmptyTickers.toString());
+      // TODO: Send to WebSocket
+      alert(`Valid tickers ready to send: ${nonEmptyTickers.join(',')}`);
+      ws?.send(nonEmptyTickers.toString()); 
+    }
+  };
+
   return (
     <div className="app-container">
       <h1>NexusCorr - Correlation Matrix</h1>
+      
+      <div className="ticker-input-section">
+        <h2>Select Tickers (2-5 required)</h2>
+        <div className="ticker-inputs">
+          {tickerInputs.map((ticker, index) => (
+            <div key={index} className="ticker-input-group">
+              <input
+                type="text"
+                placeholder={`Ticker ${index + 1}${index < 2 ? ' *' : ''}`}
+                value={ticker}
+                onChange={(e) => handleTickerChange(index, e.target.value)}
+                className={validationErrors[index] ? 'error' : ''}
+                disabled={isValidating}
+              />
+              {validationErrors[index] && (
+                <span className="error-message">{validationErrors[index]}</span>
+              )}
+            </div>
+          ))}
+        </div>
+        <button 
+          onClick={handleValidateAndSubmit}
+          disabled={isValidating}
+          className="validate-button"
+        >
+          {isValidating ? 'Validating...' : 'Validate & Add Tickers'}
+        </button>
+      </div>
       
       {symbols.length > 0 ? (
         <div className="table-container">

@@ -20,6 +20,8 @@ type MessageResponse struct {
 
 func Connector(symbols []string, dataChan chan<- []byte) {
 
+	log.Printf("Connecting to Binance for symbols: %v", symbols)
+
 	endpoint := constructBinanceEndpoint(symbols)
 	conn := Connection{endpoint: endpoint}
 	dialErr := conn.dial()
