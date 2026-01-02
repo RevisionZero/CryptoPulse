@@ -3,6 +3,7 @@ package hub
 import (
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/gorilla/websocket"
@@ -15,6 +16,52 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 }
+
+const (
+	maxSymbolLength = 20   // Maximum length for a single symbol
+	maxSymbolsCount = 100  // Maximum number of symbols per request
+)
+
+// symbolPattern validates that symbols contain only uppercase letters and numbers
+// Binance symbols are typically like BTCUSDT, ETHUSDT, etc.
+var symbolPattern = regexp.MustCompile(`^[A-Z0-9]+$`)
+
+// validateSymbols validates and sanitizes the symbols received from clients
+// Returns only valid symbols, filtering out malformed or malicious inputs
+func validateSymbols(symbols []string) []string {
+	if len(symbols) > maxSymbolsCount {
+		log.Printf("Warning: Too many symbols requested (%d), limiting to %d", len(symbols), maxSymbolsCount)
+		symbols = symbols[:maxSymbolsCount]
+	}
+
+	validSymbols := make([]string, 0, len(symbols))
+	for _, symbol := range symbols {
+		// Trim whitespace
+		symbol = strings.TrimSpace(symbol)
+		
+		// Skip empty symbols
+		if symbol == "" {
+			continue
+		}
+
+		// Check length
+		if len(symbol) > maxSymbolLength {
+			log.Printf("Warning: Symbol too long (length %d): %s", len(symbol), symbol)
+			continue
+		}
+
+		// Validate pattern (uppercase alphanumeric only)
+		if !symbolPattern.MatchString(symbol) {
+			log.Printf("Warning: Invalid symbol format: %s", symbol)
+			continue
+		}
+
+		validSymbols = append(validSymbols, symbol)
+	}
+
+	return validSymbols
+}
+
 
 func (hub *Hub) WSHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -49,9 +96,19 @@ func (hub *Hub) WSHandler(w http.ResponseWriter, r *http.Request) {
 
 		log.Printf("Received message from client: %s", msg)
 
+		// Validate and sanitize symbols before processing
+		rawSymbols := strings.Split(string(msg), ",")
+		validSymbols := validateSymbols(rawSymbols)
+
+		// Only process if we have valid symbols
+		if len(validSymbols) == 0 {
+			log.Printf("Warning: No valid symbols in request from client")
+			continue
+		}
+
 		hub.symbolReqs <- SymbolRequest{
 			Client:  conn,
-			Symbols: strings.Split(string(msg), ","),
+			Symbols: validSymbols,
 		}
 	}
 }
