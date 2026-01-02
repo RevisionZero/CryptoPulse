@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"bytes"
 	"encoding/json"
 	"log"
 	"main/internal/connection"
@@ -9,6 +10,7 @@ import (
 	"main/pkg/utils"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/gorilla/websocket"
 )
@@ -33,6 +35,13 @@ type Hub struct {
 	Disconnect chan *websocket.Conn
 	symbolReqs chan SymbolRequest
 	broadcast  chan map[string][]float64
+}
+
+var bufferPool = sync.Pool{
+	New: func() interface{} {
+		// This is called if the responses pool is empty
+		return new(bytes.Buffer)
+	},
 }
 
 func NewHub(broadcast chan map[string][]float64) *Hub {
@@ -148,12 +157,26 @@ func (hub *Hub) SendToAll(sampledData map[string][]float64) {
 
 	for _, client := range hub.clients {
 		key := strings.Join(client.Symbols, ",")
-		if _, exists := responses[key]; !exists {
+		jsonData, exists := responses[key]
+		if !exists {
+			// 1. Get a buffer from the pool
+			buf := bufferPool.Get().(*bytes.Buffer)
+			buf.Reset() // CRITICAL: Clear any data from previous use
 			engine.CalculatePCCMatrix(sampledData, client.Symbols, client.PCCMatrix)
-			responses[key], _ = json.Marshal(client.PCCMatrix)
+			jsonErr := json.NewEncoder(buf).Encode(client.PCCMatrix)
+
+			if jsonErr != nil {
+				log.Printf("JSON Encode Error: %v", jsonErr)
+				bufferPool.Put(buf) // Return even on error
+				continue
+			}
+			// responses[key], _ = json.Marshal(client.PCCMatrix)
+			jsonData = append([]byte(nil), buf.Bytes()...)
+			responses[key] = jsonData
+			bufferPool.Put(buf) // Return buffer to pool
 		}
 		select {
-		case client.Send <- responses[key]:
+		case client.Send <- jsonData:
 			// Message sent successfully
 		default:
 			// Skip if buffer is full or channel is closed to keep Hub fast
