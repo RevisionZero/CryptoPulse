@@ -26,6 +26,21 @@ const (
 // Binance symbols are typically like BTCUSDT, ETHUSDT, etc.
 var symbolPattern = regexp.MustCompile(`^[A-Z0-9]+$`)
 
+// sanitizeForLog limits and sanitizes strings for safe logging
+func sanitizeForLog(s string, maxLen int) string {
+	if len(s) > maxLen {
+		s = s[:maxLen]
+	}
+	// Replace any non-printable characters with '?'
+	return strings.Map(func(r rune) rune {
+		if r < 32 || r > 126 {
+			return '?'
+		}
+		return r
+	}, s)
+}
+
+
 // validateSymbols validates and sanitizes the symbols received from clients
 // Returns only valid symbols, filtering out malformed or malicious inputs
 func validateSymbols(symbols []string) []string {
@@ -38,7 +53,7 @@ func validateSymbols(symbols []string) []string {
 	for _, symbol := range symbols {
 		// Trim whitespace
 		symbol = strings.TrimSpace(symbol)
-		
+
 		// Skip empty symbols
 		if symbol == "" {
 			continue
@@ -46,13 +61,13 @@ func validateSymbols(symbols []string) []string {
 
 		// Check length
 		if len(symbol) > maxSymbolLength {
-			log.Printf("Warning: Symbol too long (length %d): %s", len(symbol), symbol)
+			log.Printf("Warning: Symbol too long (length %d): %s", len(symbol), sanitizeForLog(symbol, 30))
 			continue
 		}
 
 		// Validate pattern (uppercase alphanumeric only)
 		if !symbolPattern.MatchString(symbol) {
-			log.Printf("Warning: Invalid symbol format: %s", symbol)
+			log.Printf("Warning: Invalid symbol format: %s", sanitizeForLog(symbol, 30))
 			continue
 		}
 
@@ -94,7 +109,7 @@ func (hub *Hub) WSHandler(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		log.Printf("Received message from client: %s", msg)
+		log.Printf("Received message from client: %s", sanitizeForLog(string(msg), 200))
 
 		// Validate and sanitize symbols before processing
 		rawSymbols := strings.Split(string(msg), ",")
