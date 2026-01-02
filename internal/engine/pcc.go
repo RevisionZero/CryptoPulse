@@ -1,28 +1,8 @@
 package engine
 
 import (
-	"log"
 	"math"
 )
-
-func PCCMatrixCalculator(sampledDataChan <-chan map[string][]float64, symbols []string, matrixChan chan<- map[string]map[string]float64) {
-	pccMatrix := make(map[string]map[string]float64, len(symbols))
-	for _, symbolX := range symbols {
-		pccMatrix[symbolX] = make(map[string]float64, len(symbols))
-		for _, symbolY := range symbols {
-			if symbolX == symbolY {
-				pccMatrix[symbolX][symbolY] = 1.0
-			}
-		}
-	}
-	for {
-		sampledData := <-sampledDataChan
-		CalculatePCCMatrix(sampledData, symbols, pccMatrix)
-		log.Println("PCC Matrix calculated,%s", pccMatrix)
-		matrixChan <- pccMatrix
-
-	}
-}
 
 func PCC(x []float64, y []float64, sampleSize int) float64 {
 

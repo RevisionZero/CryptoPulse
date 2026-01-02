@@ -24,10 +24,18 @@ func (hub *Hub) WSHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Register client
-	hub.AddClient(conn)
+	hub.Connect <- conn
 
 	// Cleanup on disconnect
-	defer hub.RemoveClient(conn)
+	// defer hub.RemoveClient(conn)
+	defer func() {
+		select {
+		case hub.Disconnect <- conn:
+			// Signal sent successfully
+		default:
+			// Signal already sent by the other pump, or Hub is busy
+		}
+	}()
 
 	// Keep connection alive - read messages from client
 	for {
@@ -41,11 +49,9 @@ func (hub *Hub) WSHandler(w http.ResponseWriter, r *http.Request) {
 
 		log.Printf("Received message from client: %s", msg)
 
-		hub.mu.Lock()
 		hub.symbolReqs <- SymbolRequest{
-			Client:  hub.clients[conn],
+			Client:  conn,
 			Symbols: strings.Split(string(msg), ","),
 		}
-		hub.mu.Unlock()
 	}
 }

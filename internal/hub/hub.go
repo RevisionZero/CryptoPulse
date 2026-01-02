@@ -9,7 +9,6 @@ import (
 	"main/pkg/utils"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/gorilla/websocket"
 )
@@ -17,24 +16,22 @@ import (
 type Client struct {
 	ID        *websocket.Conn
 	Symbols   []string    // The coins they currently want
-	Send      chan string // Channel to push data to this specific client
-	Receive   chan string // Channel to receive data from this specific client
+	Send      chan []byte // Channel to push data to this specific client
 	Conn      bool
 	PCCMatrix map[string]map[string]float64
 }
 
 type SymbolRequest struct {
-	Client  *Client
+	Client  *websocket.Conn
 	Symbols []string
 }
 
 type Hub struct {
 	clients    map[*websocket.Conn]*Client
 	symbols    map[string]*models.SymbolAttributes
-	connect    chan *websocket.Conn
-	disconnect chan *websocket.Conn
+	Connect    chan *websocket.Conn
+	Disconnect chan *websocket.Conn
 	symbolReqs chan SymbolRequest
-	mu         sync.Mutex
 	broadcast  chan map[string][]float64
 }
 
@@ -43,9 +40,9 @@ func NewHub(broadcast chan map[string][]float64) *Hub {
 		clients:    make(map[*websocket.Conn]*Client),
 		symbols:    make(map[string]*models.SymbolAttributes),
 		broadcast:  broadcast,
-		connect:    make(chan *websocket.Conn),
-		disconnect: make(chan *websocket.Conn),
-		symbolReqs: make(chan SymbolRequest),
+		Connect:    make(chan *websocket.Conn, 64),
+		Disconnect: make(chan *websocket.Conn, 128),
+		symbolReqs: make(chan SymbolRequest, 64),
 	}
 }
 
@@ -70,28 +67,12 @@ func (hub *Hub) Run() {
 			select {
 			case message := <-hub.broadcast:
 				hub.SendToAll(message)
-			case conn := <-hub.connect:
+			case conn := <-hub.Connect:
 				hub.AddClient(conn)
-			case conn := <-hub.disconnect:
+			case conn := <-hub.Disconnect:
 				hub.RemoveClient(conn)
 			case symbolRequest := <-hub.symbolReqs:
-				log.Print("Symbols requested: ", symbolRequest.Symbols)
-				symbolRequest.Client.Symbols = []string{}
-				for _, symbol := range symbolRequest.Symbols {
-					log.Print("Symbol requested: ", symbol)
-					if _, exists := hub.symbols[symbol]; !exists {
-						hub.symbols[symbol] = &models.SymbolAttributes{
-							LatestPrice:   0.0,
-							SlidingWindow: utils.NewRingBuffer(600),
-						}
-						go connection.Connector([]string{symbol}, rawData)
-					}
-					symbolRequest.Client.Symbols = append(symbolRequest.Client.Symbols, symbol)
-					// sort.Strings(symbolRequest.Client.Symbols)
-					// ModifyClientMatrix(symbolRequest.Client)
-				}
-				sort.Strings(symbolRequest.Client.Symbols)
-				ModifyClientMatrix(symbolRequest.Client)
+				hub.HandleSymbolRequest(symbolRequest, rawData)
 			}
 
 		}
@@ -112,65 +93,101 @@ func ModifyClientMatrix(client *Client) {
 	client.PCCMatrix = pccMatrix
 }
 
+func (hub *Hub) HandleSymbolRequest(symbolRequest SymbolRequest, dataStream chan []byte) {
+	log.Print("Symbols requested: ", symbolRequest.Symbols)
+	client := hub.clients[symbolRequest.Client]
+	client.Symbols = []string{}
+	for _, symbol := range symbolRequest.Symbols {
+		log.Print("Symbol requested: ", symbol)
+		if _, exists := hub.symbols[symbol]; !exists {
+			hub.symbols[symbol] = &models.SymbolAttributes{
+				LatestPrice:   0.0,
+				SlidingWindow: utils.NewRingBuffer(600),
+			}
+			go connection.Connector([]string{symbol}, dataStream)
+		}
+		client.Symbols = append(client.Symbols, symbol)
+	}
+	sort.Strings(client.Symbols)
+	ModifyClientMatrix(client)
+}
+
 func (hub *Hub) AddClient(conn *websocket.Conn) {
-	hub.mu.Lock()
-	defer hub.mu.Unlock()
+	// hub.mu.Lock()
+	// defer hub.mu.Unlock()
 	hub.clients[conn] = &Client{
 		ID:        conn,
 		Symbols:   []string{},
-		Send:      make(chan string, 10),
-		Receive:   make(chan string, 1),
+		Send:      make(chan []byte, 30),
 		Conn:      true,
 		PCCMatrix: make(map[string]map[string]float64, 0),
 	}
+	go hub.clients[conn].writePump(hub)
 	log.Printf("Client connected. Total clients: %d", len(hub.clients))
 }
 
 func (hub *Hub) RemoveClient(conn *websocket.Conn) {
-	hub.mu.Lock()
-	defer hub.mu.Unlock()
 	if _, ok := hub.clients[conn]; ok {
+		close(hub.clients[conn].Send)
 		delete(hub.clients, conn)
 		conn.Close()
 		log.Printf("Client disconnected. Total clients: %d", len(hub.clients))
 	}
 }
 
-func (hub *Hub) Broadcast(message map[string][]float64) {
-	hub.broadcast <- message
-}
-
-func (hub *Hub) GetBroadcastChannel() chan map[string][]float64 {
-	return hub.broadcast
-}
-
 func (hub *Hub) SendToAll(sampledData map[string][]float64) {
-	hub.mu.Lock()
-	defer hub.mu.Unlock()
+	// hub.mu.Lock()
+	// defer hub.mu.Unlock()
 
 	// All responses to all clients, a map with the key being the symbols
 	// requested. This is to minimize the amount of PCC calculations done,
 	// as many clients might share identical matrices
-	responses := make(map[string]map[string]map[string]float64)
+
+	// responses := make(map[string]map[string]map[string]float64)
+	responses := make(map[string][]byte)
 
 	for _, client := range hub.clients {
 		key := strings.Join(client.Symbols, ",")
 		if _, exists := responses[key]; !exists {
 			engine.CalculatePCCMatrix(sampledData, client.Symbols, client.PCCMatrix)
-			responses[key] = client.PCCMatrix
+			responses[key], _ = json.Marshal(client.PCCMatrix)
 		}
-		jsonData, marshalErr := json.Marshal(responses[key])
-		if marshalErr != nil {
-			log.Printf("Error marshaling message: %v", marshalErr)
-			continue
-		}
-		sendErr := client.ID.WriteMessage(websocket.TextMessage, jsonData)
-		if sendErr != nil {
-			log.Printf("Error sending to client: %v", sendErr)
-			client.ID.Close()
-			delete(hub.clients, client.ID)
-			hub.RemoveClient(client.ID)
+		select {
+		case client.Send <- responses[key]:
+			// Message sent successfully
+		default:
+			// Skip if buffer is full or channel is closed to keep Hub fast
+			log.Printf("Skipping slow client:")
 		}
 	}
 
+}
+
+func (c *Client) writePump(hub *Hub) {
+	defer func() {
+		select {
+		case hub.Disconnect <- c.ID:
+			// Signal sent successfully
+		default:
+			// Signal already sent by the other pump, or Hub is busy
+		}
+	}()
+
+	for {
+		select {
+		case message, ok := <-c.Send:
+			if !ok {
+				// The Hub closed the channel, send a close message to client
+				c.ID.WriteMessage(websocket.CloseMessage, []byte{})
+				return
+			}
+
+			// Perform the actual network write
+			err := c.ID.WriteMessage(websocket.TextMessage, message)
+			if err != nil {
+				log.Printf("Write error for client %v: %v", c.ID.RemoteAddr(), err)
+				return
+			}
+		}
+	}
 }
