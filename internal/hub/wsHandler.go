@@ -30,7 +30,13 @@ func checkOrigin(r *http.Request) bool {
 	origin := r.Header.Get("Origin")
 	if origin == "" {
 		// No Origin header means it's not a browser request (e.g., direct connection)
-		// Allow for testing purposes, but log it
+		// In production, we should deny these connections for security
+		isProduction := os.Getenv("PRODUCTION") == "true" || os.Getenv("GO_ENV") == "production"
+		if isProduction {
+			log.Printf("Rejected WebSocket connection without Origin header from %s in production mode", r.RemoteAddr)
+			return false
+		}
+		// Allow for development/testing purposes, but log it
 		log.Printf("Warning: WebSocket connection without Origin header from %s", r.RemoteAddr)
 		return true
 	}
