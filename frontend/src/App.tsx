@@ -193,7 +193,7 @@ function App() {
         <p>Waiting for data...</p>
       )}
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
