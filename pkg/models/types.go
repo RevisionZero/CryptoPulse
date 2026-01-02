@@ -1,5 +1,7 @@
 package models
 
+import "main/pkg/utils"
+
 // CombinedStream represents the outer JSON wrapper from Binance
 type CombinedStream struct {
 	Stream string        `json:"stream"`
@@ -14,4 +16,9 @@ type BinanceTicker struct {
 	BestAsk   string `json:"a"`
 	TransTime int64  `json:"T"`
 	EventTime int64  `json:"E"`
+}
+
+type SymbolAttributes struct {
+	LatestPrice   float64
+	SlidingWindow *utils.RingBuffer
 }

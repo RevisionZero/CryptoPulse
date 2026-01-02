@@ -4,24 +4,6 @@ import (
 	"math"
 )
 
-func PCCMatrixCalculator(sampledDataChan <-chan map[string][]float64, symbols []string) {
-	pccMatrix := make(map[string]map[string]float64, len(symbols))
-	for _, symbolX := range symbols {
-		pccMatrix[symbolX] = make(map[string]float64, len(symbols))
-		for _, symbolY := range symbols {
-			if symbolX == symbolY {
-				pccMatrix[symbolX][symbolY] = 1.0
-			}
-		}
-	}
-	for {
-		sampledData := <-sampledDataChan
-		CalculatePCCMatrix(sampledData, symbols, pccMatrix)
-		// log.Printf("PCC Matrix: %+v\n", pccMatrix)
-
-	}
-}
-
 func PCC(x []float64, y []float64, sampleSize int) float64 {
 
 	sumOfProducts := 0.0
@@ -43,7 +25,7 @@ func PCC(x []float64, y []float64, sampleSize int) float64 {
 		diffOfSquaresX = diffOfSquaresX + (x[i]-meanX)*(x[i]-oldMeanX)
 		diffOfSquaresY = diffOfSquaresY + (y[i]-meanY)*(y[i]-oldMeanY)
 	}
-	
+
 	result := sumOfProducts / math.Sqrt(diffOfSquaresX*diffOfSquaresY)
 	if math.IsNaN(result) {
 		return 0.0
@@ -58,7 +40,15 @@ func CalculatePCCMatrix(sampledData map[string][]float64, symbols []string, pccM
 			if symbolX == symbolY {
 				pccMatrix[symbolX][symbolY] = 1.0
 			} else {
-				pccValue := PCC(sampledData[symbolX], sampledData[symbolY], len(sampledData[symbolX]))
+				dataX, okX := sampledData[symbolX]
+				dataY, okY := sampledData[symbolY]
+
+				// Check if both data slices exist and have data
+				if !okX || !okY || len(dataX) == 0 || len(dataY) == 0 {
+					continue
+				}
+
+				pccValue := PCC(dataX, dataY, len(dataX))
 				pccMatrix[symbolX][symbolY] = pccValue
 			}
 		}

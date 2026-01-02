@@ -1,36 +1,38 @@
 package engine
 
 import (
-	"main/pkg/utils"
-	"maps"
+	"main/pkg/models"
 	"sync"
 	"time"
 )
 
 const samplingPeriod = 100 * time.Millisecond
 
-func Sampler(symbols []string, latestPrices map[string]float64, lock *sync.RWMutex, slidingWindows map[string]*utils.RingBuffer, sampledDataChan chan<- map[string][]float64) {
+func Sampler(symbols map[string]*models.SymbolAttributes, lock *sync.RWMutex, sampledDataChan chan<- map[string][]float64) {
 	ticker := time.NewTicker(samplingPeriod)
 	defer ticker.Stop()
 
 	for range ticker.C {
 		lock.RLock()
-		if len(latestPrices) == 0 {
-			lock.RUnlock()
-			continue
+		// if len(latestPrices) == 0 {
+		// 	lock.RUnlock()
+		// 	continue
+		// }
+		sample := make(map[string]float64)
+		for symbol, symbolAttr := range symbols {
+			sample[symbol] = symbolAttr.LatestPrice
 		}
-		sample := maps.Clone(latestPrices)
 		lock.RUnlock()
 		sampledData := make(map[string][]float64)
-		for _, symbol := range symbols {
+		for symbol, symbolAttr := range symbols {
 			price, ok := sample[symbol]
 			if !ok {
 				continue
 			}
-			window, ok := slidingWindows[symbol]
-			if !ok || window == nil {
-				continue
-			}
+			window := symbolAttr.SlidingWindow
+			// if !ok || window == nil {
+			// 	continue
+			// }
 			window.Add(price)
 			sampledData[symbol] = window.GetAll()
 		}

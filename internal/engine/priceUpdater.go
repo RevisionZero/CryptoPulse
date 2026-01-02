@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-func PriceUpdater(latestPrices map[string]float64, dataStream <-chan []byte, lock *sync.RWMutex) {
+func PriceUpdater(symbols map[string]*models.SymbolAttributes, dataStream <-chan []byte, lock *sync.RWMutex) {
 
 	for {
 		rawData := <-dataStream
@@ -34,7 +34,11 @@ func PriceUpdater(latestPrices map[string]float64, dataStream <-chan []byte, loc
 		}
 
 		lock.Lock()
-		latestPrices[envelope.Data.Symbol] = (bid + ask) / 2
+		if sym, ok := symbols[envelope.Data.Symbol]; ok && sym != nil {
+			sym.LatestPrice = (bid + ask) / 2
+		} else {
+			log.Printf("Symbol not found or nil in symbols map: %s", envelope.Data.Symbol)
+		}
 		lock.Unlock()
 
 	}

@@ -1,0 +1,155 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.app-container {
+  padding: 20px;
+}
+
+.app-container h1 {
+  margin-bottom: 30px;
+  color: #646cff;
+}
+
+.table-container {
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+  margin-top: 20px;
+}
+
+.correlation-table {
+  border-collapse: collapse;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: white;
+  color: #333;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.correlation-table th,
+.correlation-table td {
+  padding: 12px 16px;
+  text-align: center;
+  border: 1px solid #e0e0e0;
+  min-width: 100px;
+}
+
+.correlation-table thead th {
+  background: #646cff;
+  color: white;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.correlation-table tbody th {
+  background: #646cff;
+  color: white;
+  font-weight: 600;
+  position: sticky;
+  left: 0;
+  z-index: 5;
+}
+
+.correlation-table td {
+  font-family: monospace;
+  font-size: 14px;
+  transition: background-color 0.3s ease;
+}
+
+.correlation-table td.diagonal {
+  font-weight: bold;
+  background: #f0f0f0 !important;
+}
+
+.correlation-table tbody tr:hover td {
+  background-color: rgba(100, 108, 255, 0.1) !important;
+}
+
+.correlation-table tbody tr:hover td.diagonal {
+  background-color: #e0e0e0 !important;
+}
+
+.ticker-input-section {
+  background: white;
+  padding: 24px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 30px;
+}
+
+.ticker-input-section h2 {
+  color: #333;
+  margin-bottom: 20px;
+  font-size: 1.2rem;
+}
+
+.ticker-inputs {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.ticker-input-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.ticker-input-group input {
+  padding: 10px 14px;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 14px;
+  width: 140px;
+  transition: border-color 0.3s ease;
+}
+
+.ticker-input-group input:focus {
+  outline: none;
+  border-color: #646cff;
+}
+
+.ticker-input-group input.error {
+  border-color: #ff4444;
+}
+
+.ticker-input-group input:disabled {
+  background: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.error-message {
+  color: #ff4444;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.validate-button {
+  padding: 12px 24px;
+  background: #646cff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.validate-button:hover:not(:disabled) {
+  background: #535ac8;
+}
+
+.validate-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
