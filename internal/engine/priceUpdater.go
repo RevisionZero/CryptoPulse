@@ -34,7 +34,11 @@ func PriceUpdater(symbols map[string]*models.SymbolAttributes, dataStream <-chan
 		}
 
 		lock.Lock()
-		symbols[envelope.Data.Symbol].LatestPrice = (bid + ask) / 2
+		if sym, ok := symbols[envelope.Data.Symbol]; ok && sym != nil {
+			sym.LatestPrice = (bid + ask) / 2
+		} else {
+			log.Printf("Symbol not found or nil in symbols map: %s", envelope.Data.Symbol)
+		}
 		lock.Unlock()
 
 	}
