@@ -31,6 +31,7 @@ type SymbolRequest struct {
 type Hub struct {
 	clients    map[*websocket.Conn]*Client
 	symbols    map[string]*models.SymbolAttributes
+	symbolLock sync.Mutex
 	Connect    chan *websocket.Conn
 	Disconnect chan *websocket.Conn
 	symbolReqs chan SymbolRequest
@@ -66,7 +67,7 @@ func (hub *Hub) Run() {
 
 	}
 
-	go engine.Synchronizer(hub.symbols, rawData, hub.broadcast)
+	go engine.Synchronizer(hub.symbols, rawData, hub.broadcast, &hub.symbolLock)
 	for {
 		select {
 		case message := <-hub.broadcast:
@@ -108,13 +109,18 @@ func (hub *Hub) HandleSymbolRequest(symbolRequest SymbolRequest, dataStream chan
 	client.Symbols = []string{}
 	for _, symbol := range symbolRequest.Symbols {
 		log.Print("Symbol requested: ", symbol)
+		hub.symbolLock.Lock()
 		if _, exists := hub.symbols[symbol]; !exists {
 			hub.symbols[symbol] = &models.SymbolAttributes{
 				LatestPrice:   0.0,
 				SlidingWindow: utils.NewRingBuffer(600),
 			}
+			hub.symbolLock.Unlock()
 			go connection.Connector([]string{symbol}, dataStream)
+		} else {
+			hub.symbolLock.Unlock()
 		}
+
 		client.Symbols = append(client.Symbols, symbol)
 	}
 	sort.Strings(client.Symbols)

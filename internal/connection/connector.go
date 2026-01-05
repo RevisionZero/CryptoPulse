@@ -31,15 +31,24 @@ func Connector(symbols []string, dataChan chan<- []byte) {
 	defer conn.conn.Close()
 
 	cb := CircuitBreaker{Closed, 9, 20, 0, 0, true}
-	resp := MessageResponse{[]byte{}, nil}
-	for {
+
+	internalMsgChan := make(chan MessageResponse, 100)
+
+	// Loop to have non-blocking read from connection
+	go func() {
+		for {
+			_, message, err := conn.conn.ReadMessage()
+			resp := MessageResponse{message, err}
+			internalMsgChan <- resp
+		}
+	}()
+
+	for msg := range internalMsgChan {
 
 		if cb.requestPermission() {
-			_, resp.message, resp.err = conn.conn.ReadMessage()
+			dataChan <- msg.message
 
-			dataChan <- resp.message
-
-			if resp.err != nil {
+			if msg.err != nil {
 				cb.incrementFails()
 			} else {
 				cb.incrementSuccesses()
