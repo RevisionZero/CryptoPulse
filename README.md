@@ -1,1 +1,1 @@
-# NexusCorr
+# CryptoPulse
