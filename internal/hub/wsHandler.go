@@ -8,12 +8,35 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// var upgrader = websocket.Upgrader{
+// 	CheckOrigin: func(r *http.Request) bool {
+// 		return true // Allow all origins in development
+// 	},
+// 	ReadBufferSize:  1024,
+// 	WriteBufferSize: 1024,
+// }
+
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins in development
-	},
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		// Retrieve the 'Origin' header from the incoming request
+		origin := r.Header.Get("Origin")
+
+		// Only allow your production domain (and localhost for testing)
+		// Ensure you include the protocol (https://)
+		allowedOrigins := []string{
+			"https://cryptopulseapp.dev",
+			"http://localhost:5173", // Optional: Keep Vite's dev port for local testing
+		}
+
+		for _, allowed := range allowedOrigins {
+			if origin == allowed {
+				return true
+			}
+		}
+		return false // Block all other origins
+	},
 }
 
 func (hub *Hub) WSHandler(w http.ResponseWriter, r *http.Request) {

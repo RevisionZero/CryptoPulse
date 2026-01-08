@@ -6,9 +6,16 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
+
+	// Load .env file
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, using defaults")
+	}
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
