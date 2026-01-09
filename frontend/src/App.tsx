@@ -17,12 +17,22 @@ function App() {
 
     useEffect(() => {
       // Create WebSocket connection
-      const socket = new WebSocket('ws://localhost:8080/ws');
+      // const socket = new WebSocket('ws://localhost:8080/ws');
 
       // Connection opened
-      socket.addEventListener('open', (event) => {
-        console.log('Connected to WebSocket');
-      });
+      // socket.addEventListener('open', (event) => {
+      //   console.log('Connected to WebSocket');
+      // });
+
+      // 1. Determine if we should use secure 'wss' or standard 'ws'
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      
+      // 2. Build the URL using the current domain (window.location.host)
+      // This automatically handles localhost:5173 (dev) or cryptopulseapp.dev (prod)
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+      // 3. Create the WebSocket connection
+      const socket = new WebSocket(wsUrl);
 
       // Listen for messages
       socket.addEventListener('message', (event) => {
