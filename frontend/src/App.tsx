@@ -50,14 +50,14 @@ function App() {
       });
 
       // Handle errors
-      socket.addEventListener('error', (event) => {
-        console.error('WebSocket error:', event);
-      });
+      // socket.addEventListener('error', (event) => {
+      //   console.error('WebSocket error:', event);
+      // });
 
       // Connection closed
-      socket.addEventListener('close', (event) => {
-        console.log('Disconnected from WebSocket');
-      });
+      // socket.addEventListener('close', (event) => {
+      //   console.log('Disconnected from WebSocket');
+      // });
 
       setWs(socket);
 
