@@ -129,6 +129,7 @@ function App() {
 
     setIsValidating(true);
     const newErrors = ['', '', '', '', ''];
+    const validatedTickers: string[] = [];
     let hasError = false;
 
     // Validate each non-empty ticker
@@ -140,7 +141,7 @@ function App() {
           newErrors[i] = 'Invalid ticker';
           hasError = true;
         } else {
-          tickerInputs[i] = validatedTicker;
+          validatedTickers.push(validatedTicker);
         }
       }
     }
@@ -149,12 +150,12 @@ function App() {
     setIsValidating(false);
 
     if (!hasError) {
-      // Send tickers to WebSocket
-      console.log('Sending tickers:', nonEmptyTickers.toString());
-      ws?.send(nonEmptyTickers.toString());
+      // Send validated tickers to WebSocket
+      console.log('Sending tickers:', validatedTickers.toString());
+      ws?.send(validatedTickers.toString());
       
       // Show toast notification
-      setToastMessage(`✓ Tickers added: ${nonEmptyTickers.join(', ')}`);
+      setToastMessage(`✓ Tickers added: ${validatedTickers.join(', ')}`);
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
     }
