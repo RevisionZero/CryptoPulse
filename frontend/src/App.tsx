@@ -223,13 +223,15 @@ function App() {
       
       {symbols.length > 0 ? (
         <>
-          <div className="correlation-header">
-            <h2>Correlation Matrix</h2>
+          <div className="correlation-section">
             <div className="tooltip-container">
               <span className="help-icon">?</span>
               <div className="tooltip-text">
                 Pearson Correlation (PCC) measures how closely two prices move together. +1.0 is perfect sync, -1.0 is perfect opposite
               </div>
+            </div>
+            <div className="correlation-header">
+              <h2>Correlation Matrix</h2>
             </div>
           </div>
           <div className="table-container">

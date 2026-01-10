@@ -155,13 +155,22 @@
   font-size: 1.2rem;
 }
 
-.correlation-header {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
+.correlation-section {
+  position: relative;
   margin-top: 30px;
   margin-bottom: 10px;
+}
+
+.correlation-section .tooltip-container {
+  position: absolute;
+  top: 0;
+  right: 20px;
+  z-index: 10;
+}
+
+.correlation-header {
+  display: flex;
+  justify-content: center;
 }
 
 .correlation-header h2 {
@@ -170,7 +179,6 @@
 }
 
 .tooltip-container {
-  position: relative;
   display: inline-flex;
   align-items: center;
 }
@@ -295,13 +303,16 @@
 
 .app-footer {
   margin-top: auto;
+  padding-top: 40px;
   width: 100vw;
   position: relative;
   left: 50%;
   right: 50%;
   margin-left: -50vw;
   margin-right: -50vw;
-  padding: 20px;
+  padding-bottom: 20px;
+  padding-left: 20px;
+  padding-right: 20px;
   border-top: 1px solid #e0e0e0;
   color: #666;
   font-size: 14px;
