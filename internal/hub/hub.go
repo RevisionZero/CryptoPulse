@@ -61,12 +61,6 @@ func (hub *Hub) Run() {
 	const channelCapacity = 100
 	rawData := make(chan []byte, channelCapacity)
 
-	for symbol, _ := range hub.symbols {
-
-		go connection.Connector([]string{symbol}, rawData)
-
-	}
-
 	go engine.Synchronizer(hub.symbols, rawData, hub.broadcast, &hub.symbolLock)
 	for {
 		select {
@@ -114,10 +108,13 @@ func (hub *Hub) HandleSymbolRequest(symbolRequest SymbolRequest, dataStream chan
 			hub.symbols[symbol] = &models.SymbolAttributes{
 				LatestPrice:   0.0,
 				SlidingWindow: utils.NewRingBuffer(600),
+				ClientCounter: 1,
+				Close:         make(chan bool, 1),
 			}
+			go connection.Connector([]string{symbol}, dataStream, hub.symbols[symbol].Close)
 			hub.symbolLock.Unlock()
-			go connection.Connector([]string{symbol}, dataStream)
 		} else {
+			hub.symbols[symbol].ClientCounter++
 			hub.symbolLock.Unlock()
 		}
 
@@ -143,11 +140,27 @@ func (hub *Hub) AddClient(conn *websocket.Conn) {
 
 func (hub *Hub) RemoveClient(conn *websocket.Conn) {
 	if _, ok := hub.clients[conn]; ok {
+		hub.RemoveSymbols(conn)
 		close(hub.clients[conn].Send)
 		delete(hub.clients, conn)
 		conn.Close()
 		log.Printf("Client disconnected. Total clients: %d", len(hub.clients))
 	}
+}
+
+func (hub *Hub) RemoveSymbols(conn *websocket.Conn) {
+	for _, symbol := range hub.clients[conn].Symbols {
+		hub.symbolLock.Lock()
+		if attr, exists := hub.symbols[symbol]; exists {
+			attr.ClientCounter--
+			if attr.ClientCounter <= 0 {
+				attr.Close <- true
+				delete(hub.symbols, symbol)
+			}
+		}
+		hub.symbolLock.Unlock()
+	}
+
 }
 
 func (hub *Hub) SendToAll(sampledData map[string][]float64) {

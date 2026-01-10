@@ -18,7 +18,7 @@ type MessageResponse struct {
 	err     error
 }
 
-func Connector(symbols []string, dataChan chan<- []byte) {
+func Connector(symbols []string, dataChan chan<- []byte, closeChan chan bool) {
 
 	log.Printf("Connecting to Binance for symbols: %v", symbols)
 
@@ -39,37 +39,48 @@ func Connector(symbols []string, dataChan chan<- []byte) {
 		for {
 			_, message, err := conn.conn.ReadMessage()
 			resp := MessageResponse{message, err}
-			internalMsgChan <- resp
+			select {
+
+			case internalMsgChan <- resp:
+			case <-closeChan:
+				return
+			default:
+
+			}
 		}
 	}()
 
-	for msg := range internalMsgChan {
+	for {
+		select {
+		case <-closeChan:
+			return
+		case msg := <-internalMsgChan:
+			if cb.requestPermission() {
+				dataChan <- msg.message
 
-		if cb.requestPermission() {
-			dataChan <- msg.message
-
-			if msg.err != nil {
-				cb.incrementFails()
+				if msg.err != nil {
+					cb.incrementFails()
+				} else {
+					cb.incrementSuccesses()
+				}
 			} else {
-				cb.incrementSuccesses()
-			}
-		} else {
-			maxWait := 60000
-			baseWait := 1000
-			for baseWait > 0 {
-				waitTime := rand.Float64() * float64(baseWait)
-				time.Sleep(time.Duration(waitTime) * time.Millisecond)
-				dialErr = conn.dial()
-				cb.setDialState(dialErr)
-				if cb.requestPermission() {
-					break
-				}
-				if baseWait < maxWait {
-					baseWait *= 2
+				maxWait := 60000
+				baseWait := 1000
+				for baseWait > 0 {
+					waitTime := rand.Float64() * float64(baseWait)
+					time.Sleep(time.Duration(waitTime) * time.Millisecond)
+					dialErr = conn.dial()
+					cb.setDialState(dialErr)
+					if cb.requestPermission() {
+						break
+					}
+					if baseWait < maxWait {
+						baseWait *= 2
+					}
 				}
 			}
+		default:
 		}
-
 	}
 
 }
