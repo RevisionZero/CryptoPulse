@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"log"
+	"log/slog"
 	"main/internal/connection"
 	"main/internal/engine"
 	"main/pkg/models"
@@ -135,7 +136,7 @@ func (hub *Hub) AddClient(conn *websocket.Conn) {
 		PCCMatrix: make(map[string]map[string]float64, 0),
 	}
 	go hub.clients[conn].writePump(hub)
-	log.Printf("Client connected. Total clients: %d", len(hub.clients))
+	slog.Info("Client connected. Total clients: %d", len(hub.clients))
 }
 
 func (hub *Hub) RemoveClient(conn *websocket.Conn) {
@@ -144,7 +145,7 @@ func (hub *Hub) RemoveClient(conn *websocket.Conn) {
 		close(hub.clients[conn].Send)
 		delete(hub.clients, conn)
 		conn.Close()
-		log.Printf("Client disconnected. Total clients: %d", len(hub.clients))
+		slog.Info("Client disconnected. Total clients: %d", len(hub.clients))
 	}
 }
 
@@ -156,7 +157,7 @@ func (hub *Hub) RemoveSymbols(conn *websocket.Conn) {
 			if attr.ClientCounter <= 0 {
 				attr.Close <- true
 				delete(hub.symbols, symbol)
-				log.Printf("Deleted symbol: ", symbol)
+				slog.Info("Deleted symbol: ", symbol)
 			}
 		}
 		hub.symbolLock.Unlock()
@@ -186,7 +187,7 @@ func (hub *Hub) SendToAll(sampledData map[string][]float64) {
 			jsonErr := json.NewEncoder(buf).Encode(client.PCCMatrix)
 
 			if jsonErr != nil {
-				log.Printf("JSON Encode Error: %v", jsonErr)
+				slog.Info("JSON Encode Error: %v", jsonErr)
 				bufferPool.Put(buf) // Return even on error
 				continue
 			}
@@ -200,7 +201,7 @@ func (hub *Hub) SendToAll(sampledData map[string][]float64) {
 			// Message sent successfully
 		default:
 			// Skip if buffer is full or channel is closed to keep Hub fast
-			log.Printf("Skipping slow client:")
+			slog.Info("Skipping slow client:")
 		}
 	}
 
@@ -228,7 +229,7 @@ func (c *Client) writePump(hub *Hub) {
 			// Perform the actual network write
 			err := c.ID.WriteMessage(websocket.TextMessage, message)
 			if err != nil {
-				log.Printf("Write error for client %v: %v", c.ID.RemoteAddr(), err)
+				slog.Info("Write error for client %v: %v", c.ID.RemoteAddr(), err)
 				return
 			}
 		}

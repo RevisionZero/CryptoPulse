@@ -1,7 +1,7 @@
 package connection
 
 import (
-	"log"
+	"log/slog"
 	"math/rand/v2"
 	"time"
 
@@ -20,13 +20,14 @@ type MessageResponse struct {
 
 func Connector(symbols []string, dataChan chan<- []byte, closeChan chan bool) {
 
-	log.Printf("Connecting to Binance for symbols: %v", symbols)
+	slog.Info("Connecting to Binance for symbols: %v", symbols)
 
 	endpoint := constructBinanceEndpoint(symbols)
 	conn := Connection{endpoint: endpoint}
 	dialErr := conn.dial()
 	if dialErr != nil {
-		log.Fatal("Dial error:", dialErr)
+		slog.Info("Dial error:", dialErr)
+		return
 	}
 	defer conn.conn.Close()
 

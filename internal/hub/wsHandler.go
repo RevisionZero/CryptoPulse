@@ -1,7 +1,7 @@
 package hub
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -42,7 +42,7 @@ var upgrader = websocket.Upgrader{
 func (hub *Hub) WSHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("WebSocket upgrade error: %v", err)
+		slog.Info("WebSocket upgrade error: %v", err)
 		return
 	}
 
@@ -65,12 +65,12 @@ func (hub *Hub) WSHandler(w http.ResponseWriter, r *http.Request) {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("WebSocket error: %v", err)
+				slog.Info("WebSocket error: %v", err)
 			}
 			break
 		}
 
-		log.Printf("Received message from client: %s", msg)
+		slog.Info("Received message from client: %s", msg)
 
 		hub.symbolReqs <- SymbolRequest{
 			Client:  conn,

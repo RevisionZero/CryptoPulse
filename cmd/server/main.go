@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 	"main/internal/hub"
 	"net/http"
 	"os"
@@ -12,9 +12,15 @@ import (
 
 func main() {
 
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+
+	slog.SetDefault(logger)
+
 	// Load .env file
 	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found, using defaults")
+		slog.Info("No .env file found, using defaults")
 	}
 
 	interrupt := make(chan os.Signal, 1)
@@ -26,9 +32,10 @@ func main() {
 
 	http.HandleFunc("/ws", hub.WSHandler)
 	go func() {
-		log.Println("WebSocket server starting on :8080")
+		slog.Info("WebSocket server starting on :8080")
 		if err := http.ListenAndServe(":8080", nil); err != nil {
-			log.Fatalf("HTTP server error: %v", err)
+			slog.Info("HTTP server error: %v", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -37,7 +44,7 @@ func main() {
 	for {
 		select {
 		case <-interrupt:
-			log.Println("Interrupt received, closing connection...")
+			slog.Info("Interrupt received, closing connection...")
 			return
 		}
 	}
