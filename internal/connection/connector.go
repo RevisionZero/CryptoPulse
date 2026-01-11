@@ -38,6 +38,9 @@ func Connector(symbols []string, dataChan chan<- []byte, closeChan chan bool) {
 	go func() {
 		for {
 			_, message, err := conn.conn.ReadMessage()
+			if err != nil {
+				return
+			}
 			resp := MessageResponse{message, err}
 			select {
 
