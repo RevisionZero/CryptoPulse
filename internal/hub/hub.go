@@ -156,6 +156,7 @@ func (hub *Hub) RemoveSymbols(conn *websocket.Conn) {
 			if attr.ClientCounter <= 0 {
 				attr.Close <- true
 				delete(hub.symbols, symbol)
+				log.Printf("Deleted symbol: ", symbol)
 			}
 		}
 		hub.symbolLock.Unlock()
