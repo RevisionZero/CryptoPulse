@@ -7,11 +7,9 @@ import (
 
 const slidingWindowSize = 600
 
-func Synchronizer(symbols map[string]*models.SymbolAttributes, dataStream <-chan []byte, sampledDataChan chan map[string][]float64) {
+func Synchronizer(symbols map[string]*models.SymbolAttributes, dataStream <-chan []byte, sampledDataChan chan map[string][]float64, symbolLock *sync.Mutex) {
 
-	var lock sync.RWMutex
+	go PriceUpdater(symbols, dataStream, symbolLock)
 
-	go PriceUpdater(symbols, dataStream, &lock)
-
-	go Sampler(symbols, &lock, sampledDataChan)
+	go Sampler(symbols, symbolLock, sampledDataChan)
 }

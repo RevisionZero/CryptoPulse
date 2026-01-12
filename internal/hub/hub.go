@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"log"
+	"log/slog"
 	"main/internal/connection"
 	"main/internal/engine"
 	"main/pkg/models"
@@ -31,6 +32,7 @@ type SymbolRequest struct {
 type Hub struct {
 	clients    map[*websocket.Conn]*Client
 	symbols    map[string]*models.SymbolAttributes
+	symbolLock sync.Mutex
 	Connect    chan *websocket.Conn
 	Disconnect chan *websocket.Conn
 	symbolReqs chan SymbolRequest
@@ -60,13 +62,7 @@ func (hub *Hub) Run() {
 	const channelCapacity = 100
 	rawData := make(chan []byte, channelCapacity)
 
-	for symbol, _ := range hub.symbols {
-
-		go connection.Connector([]string{symbol}, rawData)
-
-	}
-
-	go engine.Synchronizer(hub.symbols, rawData, hub.broadcast)
+	go engine.Synchronizer(hub.symbols, rawData, hub.broadcast, &hub.symbolLock)
 	for {
 		select {
 		case message := <-hub.broadcast:
@@ -108,13 +104,21 @@ func (hub *Hub) HandleSymbolRequest(symbolRequest SymbolRequest, dataStream chan
 	client.Symbols = []string{}
 	for _, symbol := range symbolRequest.Symbols {
 		log.Print("Symbol requested: ", symbol)
+		hub.symbolLock.Lock()
 		if _, exists := hub.symbols[symbol]; !exists {
 			hub.symbols[symbol] = &models.SymbolAttributes{
 				LatestPrice:   0.0,
 				SlidingWindow: utils.NewRingBuffer(600),
+				ClientCounter: 1,
+				Close:         make(chan bool, 1),
 			}
-			go connection.Connector([]string{symbol}, dataStream)
+			go connection.Connector([]string{symbol}, dataStream, hub.symbols[symbol].Close)
+			hub.symbolLock.Unlock()
+		} else {
+			hub.symbols[symbol].ClientCounter++
+			hub.symbolLock.Unlock()
 		}
+
 		client.Symbols = append(client.Symbols, symbol)
 	}
 	sort.Strings(client.Symbols)
@@ -132,16 +136,33 @@ func (hub *Hub) AddClient(conn *websocket.Conn) {
 		PCCMatrix: make(map[string]map[string]float64, 0),
 	}
 	go hub.clients[conn].writePump(hub)
-	log.Printf("Client connected. Total clients: %d", len(hub.clients))
+	slog.Info("Client connected. Total clients: %d", len(hub.clients))
 }
 
 func (hub *Hub) RemoveClient(conn *websocket.Conn) {
 	if _, ok := hub.clients[conn]; ok {
+		hub.RemoveSymbols(conn)
 		close(hub.clients[conn].Send)
 		delete(hub.clients, conn)
 		conn.Close()
-		log.Printf("Client disconnected. Total clients: %d", len(hub.clients))
+		slog.Info("Client disconnected. Total clients: %d", len(hub.clients))
 	}
+}
+
+func (hub *Hub) RemoveSymbols(conn *websocket.Conn) {
+	for _, symbol := range hub.clients[conn].Symbols {
+		hub.symbolLock.Lock()
+		if attr, exists := hub.symbols[symbol]; exists {
+			attr.ClientCounter--
+			if attr.ClientCounter <= 0 {
+				attr.Close <- true
+				delete(hub.symbols, symbol)
+				slog.Info("Deleted symbol: ", symbol)
+			}
+		}
+		hub.symbolLock.Unlock()
+	}
+
 }
 
 func (hub *Hub) SendToAll(sampledData map[string][]float64) {
@@ -166,7 +187,7 @@ func (hub *Hub) SendToAll(sampledData map[string][]float64) {
 			jsonErr := json.NewEncoder(buf).Encode(client.PCCMatrix)
 
 			if jsonErr != nil {
-				log.Printf("JSON Encode Error: %v", jsonErr)
+				slog.Info("JSON Encode Error: %v", jsonErr)
 				bufferPool.Put(buf) // Return even on error
 				continue
 			}
@@ -180,7 +201,7 @@ func (hub *Hub) SendToAll(sampledData map[string][]float64) {
 			// Message sent successfully
 		default:
 			// Skip if buffer is full or channel is closed to keep Hub fast
-			log.Printf("Skipping slow client:")
+			slog.Info("Skipping slow client:")
 		}
 	}
 
@@ -208,7 +229,7 @@ func (c *Client) writePump(hub *Hub) {
 			// Perform the actual network write
 			err := c.ID.WriteMessage(websocket.TextMessage, message)
 			if err != nil {
-				log.Printf("Write error for client %v: %v", c.ID.RemoteAddr(), err)
+				slog.Info("Write error for client %v: %v", c.ID.RemoteAddr(), err)
 				return
 			}
 		}

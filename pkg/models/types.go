@@ -21,4 +21,6 @@ type BinanceTicker struct {
 type SymbolAttributes struct {
 	LatestPrice   float64
 	SlidingWindow *utils.RingBuffer
+	ClientCounter int       // Maintain a count of clients actively using this symbol
+	Close         chan bool // Channel to signal close unused websocket for symbol
 }
