@@ -83,7 +83,6 @@ func Connector(symbols []string, dataChan chan<- []byte, closeChan chan bool) {
 					}
 				}
 			}
-		default:
 		}
 	}
 
