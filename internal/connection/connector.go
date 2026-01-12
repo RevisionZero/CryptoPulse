@@ -1,7 +1,7 @@
 package connection
 
 import (
-	"log"
+	"log/slog"
 	"math/rand/v2"
 	"time"
 
@@ -18,49 +18,71 @@ type MessageResponse struct {
 	err     error
 }
 
-func Connector(symbols []string, dataChan chan<- []byte) {
+func Connector(symbols []string, dataChan chan<- []byte, closeChan chan bool) {
 
-	log.Printf("Connecting to Binance for symbols: %v", symbols)
+	slog.Info("Connecting to Binance for symbols: %v", symbols)
 
 	endpoint := constructBinanceEndpoint(symbols)
 	conn := Connection{endpoint: endpoint}
 	dialErr := conn.dial()
 	if dialErr != nil {
-		log.Fatal("Dial error:", dialErr)
+		slog.Info("Dial error:", dialErr)
+		return
 	}
 	defer conn.conn.Close()
 
 	cb := CircuitBreaker{Closed, 9, 20, 0, 0, true}
-	resp := MessageResponse{[]byte{}, nil}
-	for {
 
-		if cb.requestPermission() {
-			_, resp.message, resp.err = conn.conn.ReadMessage()
+	internalMsgChan := make(chan MessageResponse, 100)
 
-			dataChan <- resp.message
-
-			if resp.err != nil {
-				cb.incrementFails()
-			} else {
-				cb.incrementSuccesses()
+	// Loop to have non-blocking read from connection
+	go func() {
+		for {
+			_, message, err := conn.conn.ReadMessage()
+			if err != nil {
+				close(internalMsgChan)
+				return
 			}
-		} else {
-			maxWait := 60000
-			baseWait := 1000
-			for baseWait > 0 {
-				waitTime := rand.Float64() * float64(baseWait)
-				time.Sleep(time.Duration(waitTime) * time.Millisecond)
-				dialErr = conn.dial()
-				cb.setDialState(dialErr)
-				if cb.requestPermission() {
-					break
+			resp := MessageResponse{message, err}
+			select {
+
+			case internalMsgChan <- resp:
+			case <-closeChan:
+				return
+			}
+		}
+	}()
+
+	for {
+		select {
+		case <-closeChan:
+			return
+		case msg := <-internalMsgChan:
+			if cb.requestPermission() {
+				dataChan <- msg.message
+
+				if msg.err != nil {
+					cb.incrementFails()
+				} else {
+					cb.incrementSuccesses()
 				}
-				if baseWait < maxWait {
-					baseWait *= 2
+			} else {
+				maxWait := 60000
+				baseWait := 1000
+				for baseWait > 0 {
+					waitTime := rand.Float64() * float64(baseWait)
+					time.Sleep(time.Duration(waitTime) * time.Millisecond)
+					dialErr = conn.dial()
+					cb.setDialState(dialErr)
+					if cb.requestPermission() {
+						break
+					}
+					if baseWait < maxWait {
+						baseWait *= 2
+					}
 				}
 			}
 		}
-
 	}
 
 }

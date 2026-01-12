@@ -2,6 +2,7 @@ package connection
 
 import (
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -11,5 +12,11 @@ func constructBinanceEndpoint(symbols []string) string {
 		streamsURL += fmt.Sprintf("%s@bookTicker/", strings.ToLower(symbol))
 	}
 	streamsURL = streamsURL[:len(streamsURL)-1]
-	return fmt.Sprintf("wss://fstream.binance.com/stream?streams=%s", streamsURL)
+	
+	baseURL := os.Getenv("BINANCE_WS_URL")
+	if baseURL == "" {
+		baseURL = "wss://fstream.binance.com/stream" // fallback default
+	}
+	
+	return fmt.Sprintf("%s?streams=%s", baseURL, streamsURL)
 }

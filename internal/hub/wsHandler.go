@@ -1,25 +1,48 @@
 package hub
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/gorilla/websocket"
 )
 
+// var upgrader = websocket.Upgrader{
+// 	CheckOrigin: func(r *http.Request) bool {
+// 		return true // Allow all origins in development
+// 	},
+// 	ReadBufferSize:  1024,
+// 	WriteBufferSize: 1024,
+// }
+
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins in development
-	},
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		// Retrieve the 'Origin' header from the incoming request
+		origin := r.Header.Get("Origin")
+
+		// Only allow your production domain (and localhost for testing)
+		// Ensure you include the protocol (https://)
+		allowedOrigins := []string{
+			"https://cryptopulseapp.dev",
+			"http://localhost:5173", // Optional: Keep Vite's dev port for local testing
+		}
+
+		for _, allowed := range allowedOrigins {
+			if origin == allowed {
+				return true
+			}
+		}
+		return false // Block all other origins
+	},
 }
 
 func (hub *Hub) WSHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("WebSocket upgrade error: %v", err)
+		slog.Info("WebSocket upgrade error: %v", err)
 		return
 	}
 
@@ -42,12 +65,12 @@ func (hub *Hub) WSHandler(w http.ResponseWriter, r *http.Request) {
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("WebSocket error: %v", err)
+				slog.Info("WebSocket error: %v", err)
 			}
 			break
 		}
 
-		log.Printf("Received message from client: %s", msg)
+		slog.Info("Received message from client: %s", msg)
 
 		hub.symbolReqs <- SymbolRequest{
 			Client:  conn,
