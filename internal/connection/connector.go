@@ -40,6 +40,7 @@ func Connector(symbols []string, dataChan chan<- []byte, closeChan chan bool) {
 		for {
 			_, message, err := conn.conn.ReadMessage()
 			if err != nil {
+				close(internalMsgChan)
 				return
 			}
 			resp := MessageResponse{message, err}
@@ -48,8 +49,6 @@ func Connector(symbols []string, dataChan chan<- []byte, closeChan chan bool) {
 			case internalMsgChan <- resp:
 			case <-closeChan:
 				return
-			default:
-
 			}
 		}
 	}()
