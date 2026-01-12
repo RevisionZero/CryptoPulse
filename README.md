@@ -95,33 +95,33 @@ graph TB
 The system is designed with a Hub-and-Spoke concurrency model to handle high-frequency data streams without blocking or race conditions.
 
 ### Key Engineering Features:
-- Online Algorithm Logic: Utilizes an incremental calculation engine to process trade events as they arrive, avoiding heavy batch processing.
+- **Online Algorithm Logic**: Utilizes an incremental calculation engine to process trade events as they arrive, avoiding heavy batch processing.
 
-- Sliding Window Analytics: Implements a rolling temporal window for sampling, ensuring that correlation data reflects immediate market shifts rather than historical noise.
+- **Sliding Window Analytics**: Implements a rolling temporal window for sampling, ensuring that correlation data reflects immediate market shifts rather than historical noise.
 
-- Smart Resource Reclamation: Features a reference-counting lifecycle manager that automatically terminates unused WebSocket feeds when users disconnect, optimizing CPU and network usage.
+- **Smart Resource Reclamation**: Features a reference-counting lifecycle manager that automatically terminates unused WebSocket feeds when users disconnect, optimizing CPU and network usage.
 
-- Resiliency (Circuit Breaker): Implements a custom Circuit Breaker with exponential backoff to handle external API instability and rate-limiting gracefully.
+- **Resiliency (Circuit Breaker)**: Implements a custom Circuit Breaker with exponential backoff to handle external API instability and rate-limiting gracefully.
 
-- Memory Optimization: Uses sync.Pool for buffer reuse to minimize Garbage Collection (GC) overhead during high-frequency JSON broadcasting.
+- **Memory Optimization**: Uses sync.Pool for buffer reuse to minimize Garbage Collection (GC) overhead during high-frequency JSON broadcasting.
 
 ## 🏗 System Design
-- Backend: Golang (Gorilla WebSockets, slog)
+- **Backend**: Golang (Gorilla WebSockets, slog)
 
-- Frontend: React, Vite, Tailwind CSS
+- **Frontend**: React, Vite, Tailwind CSS
 
-- Reverse Proxy: Caddy (SSL/TLS termination, High-performance routing)
+- **Reverse Proxy**: Caddy (SSL/TLS termination, High-performance routing)
 
-- Infrastructure: Docker, Docker Compose, Oracle Cloud (OCI)
+- **Infrastructure**: Docker, Docker Compose, Oracle Cloud (OCI)
 
 ## 📊 Numerical Stability & Math
 Calculating correlation across assets with vastly different price scales (e.g., BTC at $40k vs. SHIB at $0.00001) requires careful normalization. CryptoPulse handles this by:
 
-1. Normalizing quote-asset volatility.
+1. **Normalizing quote-asset volatility**.
 
-2. Synchronizing disparate price update frequencies into a unified sampling window.
+2. **Synchronizing disparate price update frequencies** into a unified sampling window.
 
-3. Handling "Denominator Bias" to ensure the Pearson Correlation Coefficient(PCC) calculation remains numerically stable.
+3. **Handling "Denominator Bias"** to ensure catastrophic cancellation doesn't happen and the Pearson Correlation Coefficient(PCC) calculation remains numerically stable.
 
 ## Pearson Correlation Coefficient
 
