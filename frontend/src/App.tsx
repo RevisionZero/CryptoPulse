@@ -96,7 +96,7 @@ function App() {
 
   const validateTicker = async (ticker: string): Promise<string> => {
     if (!ticker) return ticker; // Empty is valid (optional field)
-    
+    ticker = ticker.toUpperCase();
     try {
       const response = await fetch(`https://api.binance.com/api/v3/exchangeInfo?symbol=${ticker}`);
       if (response.ok) {
@@ -110,10 +110,10 @@ function App() {
         if (response.ok) {
           return newTicker;
         }
+        return 'INVALID_TICKER';
       } catch (err) {
         return 'INVALID_TICKER';
       }
-      return 'INVALID_TICKER';
     }
   };
 
