@@ -8,6 +8,7 @@ import (
 	"main/internal/connection"
 	"main/internal/engine"
 	"main/pkg/models"
+	"main/pkg/tracker"
 	"main/pkg/utils"
 	"sort"
 	"strings"
@@ -37,6 +38,7 @@ type Hub struct {
 	Disconnect chan *websocket.Conn
 	symbolReqs chan SymbolRequest
 	broadcast  chan map[string][]float64
+	Tracker    *tracker.Tracker
 }
 
 var bufferPool = sync.Pool{
@@ -46,7 +48,7 @@ var bufferPool = sync.Pool{
 	},
 }
 
-func NewHub(broadcast chan map[string][]float64) *Hub {
+func NewHub(broadcast chan map[string][]float64, t *tracker.Tracker) *Hub {
 	return &Hub{
 		clients:    make(map[*websocket.Conn]*Client),
 		symbols:    make(map[string]*models.SymbolAttributes),
@@ -54,6 +56,7 @@ func NewHub(broadcast chan map[string][]float64) *Hub {
 		Connect:    make(chan *websocket.Conn, 64),
 		Disconnect: make(chan *websocket.Conn, 128),
 		symbolReqs: make(chan SymbolRequest, 64),
+		Tracker:    t,
 	}
 }
 

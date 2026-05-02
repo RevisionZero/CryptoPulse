@@ -2,6 +2,7 @@ package hub
 
 import (
 	"log/slog"
+	"main/pkg/tracker"
 	"net/http"
 	"strings"
 
@@ -40,6 +41,9 @@ var upgrader = websocket.Upgrader{
 }
 
 func (hub *Hub) WSHandler(w http.ResponseWriter, r *http.Request) {
+	ip := tracker.ExtractIP(r.Header.Get("X-Forwarded-For"), r.RemoteAddr)
+	hub.Tracker.RecordVisit(ip)
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		slog.Info("WebSocket upgrade error: %v", err)
