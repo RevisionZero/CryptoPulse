@@ -22,6 +22,9 @@ type Client struct {
 	Send      chan []byte // Channel to push data to this specific client
 	Conn      bool
 	PCCMatrix map[string]map[string]float64
+	// For each symbol pair, maintain running means, centered sums, and centered cross points
+	// instead of recalculating the PCC from scratch
+	WelfordMatrix map[string]map[string]models.WelfordData
 }
 
 type SymbolRequest struct {
@@ -36,7 +39,7 @@ type Hub struct {
 	Connect    chan *websocket.Conn
 	Disconnect chan *websocket.Conn
 	symbolReqs chan SymbolRequest
-	broadcast  chan map[string][]float64
+	broadcast  chan map[string]models.DataUpdate
 }
 
 var bufferPool = sync.Pool{
@@ -46,7 +49,7 @@ var bufferPool = sync.Pool{
 	},
 }
 
-func NewHub(broadcast chan map[string][]float64) *Hub {
+func NewHub(broadcast chan map[string]models.DataUpdate) *Hub {
 	return &Hub{
 		clients:    make(map[*websocket.Conn]*Client),
 		symbols:    make(map[string]*models.SymbolAttributes),
@@ -129,11 +132,12 @@ func (hub *Hub) AddClient(conn *websocket.Conn) {
 	// hub.mu.Lock()
 	// defer hub.mu.Unlock()
 	hub.clients[conn] = &Client{
-		ID:        conn,
-		Symbols:   []string{},
-		Send:      make(chan []byte, 30),
-		Conn:      true,
-		PCCMatrix: make(map[string]map[string]float64, 0),
+		ID:            conn,
+		Symbols:       []string{},
+		Send:          make(chan []byte, 30),
+		Conn:          true,
+		PCCMatrix:     make(map[string]map[string]float64, 0),
+		WelfordMatrix: make(map[string]map[string]models.WelfordData),
 	}
 	go hub.clients[conn].writePump(hub)
 	slog.Info("Client connected. Total clients: %d", len(hub.clients))
@@ -165,7 +169,7 @@ func (hub *Hub) RemoveSymbols(conn *websocket.Conn) {
 
 }
 
-func (hub *Hub) SendToAll(sampledData map[string][]float64) {
+func (hub *Hub) SendToAll(sampledData map[string]models.DataUpdate) {
 	// hub.mu.Lock()
 	// defer hub.mu.Unlock()
 

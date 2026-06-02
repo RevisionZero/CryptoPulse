@@ -3,6 +3,7 @@ package main
 import (
 	"log/slog"
 	"main/internal/hub"
+	"main/pkg/models"
 	"net/http"
 	"os"
 	"os/signal"
@@ -26,7 +27,7 @@ func main() {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
-	broadcast := make(chan map[string][]float64, 256)
+	broadcast := make(chan map[string]models.DataUpdate, 256)
 
 	hub := hub.NewHub(broadcast)
 

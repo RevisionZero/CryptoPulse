@@ -24,3 +24,21 @@ type SymbolAttributes struct {
 	ClientCounter int       // Maintain a count of clients actively using this symbol
 	Close         chan bool // Channel to signal close unused websocket for symbol
 }
+
+// Instead of sending entire sliding window with each update, send only the new point,
+// the evicted point, and if the ring buffer is full
+type DataUpdate struct {
+	New     float64
+	Evicted float64
+	Full    bool
+}
+
+// Track running means, centered sums, and centered cross points
+type WelfordData struct {
+	N     int     // Number of samples currently in the window │
+	MeanX float64 // Running mean of X
+	MeanY float64 // Running mean of Y
+	Mxx   float64 // Σ(x − x̄)² — centered sum of squares for X
+	Myy   float64 // Σ(y − ȳ)² — centered sum of squares for Y
+	Mxy   float64 // Σ(x − x̄)(y − ȳ) — centered cross-product
+}
