@@ -17,6 +17,7 @@ import (
 // }
 
 var upgrader = websocket.Upgrader{
+	// 1024-byte buffers are enough for small symbol subscription payloads.
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
@@ -39,6 +40,7 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+// WSHandler upgrades HTTP requests, tracks client lifecycle, and forwards symbol requests.
 func (hub *Hub) WSHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {

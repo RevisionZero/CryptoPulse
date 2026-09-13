@@ -6,8 +6,10 @@ import (
 	"time"
 )
 
+// samplingPeriod controls how often latest prices are snapped into sliding windows.
 const samplingPeriod = 100 * time.Millisecond
 
+// Sampler periodically snapshots latest symbol prices and publishes windowed series data.
 func Sampler(symbols map[string]*models.SymbolAttributes, symbolLock *sync.Mutex, sampledDataChan chan<- map[string][]float64) {
 	ticker := time.NewTicker(samplingPeriod)
 	defer ticker.Stop()

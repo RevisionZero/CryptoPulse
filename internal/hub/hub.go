@@ -16,6 +16,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// Client tracks one websocket peer and the symbols/matrix currently associated with it.
 type Client struct {
 	ID        *websocket.Conn
 	Symbols   []string    // The coins they currently want
@@ -24,11 +25,13 @@ type Client struct {
 	PCCMatrix map[string]map[string]float64
 }
 
+// SymbolRequest represents one inbound symbol subscription update from a client.
 type SymbolRequest struct {
 	Client  *websocket.Conn
 	Symbols []string
 }
 
+// Hub coordinates websocket clients, symbol lifecycle, and computed broadcast payloads.
 type Hub struct {
 	clients    map[*websocket.Conn]*Client
 	symbols    map[string]*models.SymbolAttributes
@@ -39,6 +42,7 @@ type Hub struct {
 	broadcast  chan map[string][]float64
 }
 
+// bufferPool reuses temporary encoding buffers to reduce allocations during fan-out.
 var bufferPool = sync.Pool{
 	New: func() interface{} {
 		// This is called if the responses pool is empty
@@ -46,6 +50,7 @@ var bufferPool = sync.Pool{
 	},
 }
 
+// NewHub builds a hub with pre-sized channels for expected connect/disconnect bursts.
 func NewHub(broadcast chan map[string][]float64) *Hub {
 	return &Hub{
 		clients:    make(map[*websocket.Conn]*Client),
@@ -57,8 +62,10 @@ func NewHub(broadcast chan map[string][]float64) *Hub {
 	}
 }
 
+// Run starts the symbol synchronizer and processes all hub events in a single loop.
 func (hub *Hub) Run() {
 
+	// Keep a modest queue so short read spikes from exchange streams do not block producers.
 	const channelCapacity = 100
 	rawData := make(chan []byte, channelCapacity)
 
@@ -69,6 +76,7 @@ func (hub *Hub) Run() {
 			hub.SendToAll(message)
 		default:
 			// Put justification here for why putting the case again
+			// The nested select gives connection management a chance to run when no broadcast is ready.
 			select {
 			case message := <-hub.broadcast:
 				hub.SendToAll(message)
@@ -85,6 +93,7 @@ func (hub *Hub) Run() {
 	}
 }
 
+// ModifyClientMatrix initializes/refreshes a client's PCC matrix for the active symbol set.
 func ModifyClientMatrix(client *Client) {
 	pccMatrix := make(map[string]map[string]float64, len(client.Symbols))
 	for _, symbolX := range client.Symbols {
@@ -98,6 +107,7 @@ func ModifyClientMatrix(client *Client) {
 	client.PCCMatrix = pccMatrix
 }
 
+// HandleSymbolRequest updates hub symbol state and starts upstream streams as symbols appear.
 func (hub *Hub) HandleSymbolRequest(symbolRequest SymbolRequest, dataStream chan []byte) {
 	log.Print("Symbols requested: ", symbolRequest.Symbols)
 	client := hub.clients[symbolRequest.Client]
@@ -107,11 +117,13 @@ func (hub *Hub) HandleSymbolRequest(symbolRequest SymbolRequest, dataStream chan
 		hub.symbolLock.Lock()
 		if _, exists := hub.symbols[symbol]; !exists {
 			hub.symbols[symbol] = &models.SymbolAttributes{
-				LatestPrice:   0.0,
+				LatestPrice: 0.0,
+				// Keep 600 samples (~60s at 100ms sampling cadence) for PCC calculations.
 				SlidingWindow: utils.NewRingBuffer(600),
 				ClientCounter: 1,
 				Close:         make(chan bool, 1),
 			}
+			// Connector expects a symbol list; this stream is intentionally scoped to one symbol.
 			go connection.Connector([]string{symbol}, dataStream, hub.symbols[symbol].Close)
 			hub.symbolLock.Unlock()
 		} else {
@@ -125,12 +137,14 @@ func (hub *Hub) HandleSymbolRequest(symbolRequest SymbolRequest, dataStream chan
 	ModifyClientMatrix(client)
 }
 
+// AddClient registers a websocket and starts its dedicated write pump.
 func (hub *Hub) AddClient(conn *websocket.Conn) {
 	// hub.mu.Lock()
 	// defer hub.mu.Unlock()
 	hub.clients[conn] = &Client{
-		ID:        conn,
-		Symbols:   []string{},
+		ID:      conn,
+		Symbols: []string{},
+		// Buffer outbound messages so occasional slow writes do not stall hub event handling.
 		Send:      make(chan []byte, 30),
 		Conn:      true,
 		PCCMatrix: make(map[string]map[string]float64, 0),
@@ -139,6 +153,7 @@ func (hub *Hub) AddClient(conn *websocket.Conn) {
 	slog.Info("Client connected. Total clients: %d", len(hub.clients))
 }
 
+// RemoveClient removes a websocket client and releases symbol resources it no longer needs.
 func (hub *Hub) RemoveClient(conn *websocket.Conn) {
 	if _, ok := hub.clients[conn]; ok {
 		hub.RemoveSymbols(conn)
@@ -149,6 +164,7 @@ func (hub *Hub) RemoveClient(conn *websocket.Conn) {
 	}
 }
 
+// RemoveSymbols decrements symbol subscriber counts and tears down orphaned exchange streams.
 func (hub *Hub) RemoveSymbols(conn *websocket.Conn) {
 	for _, symbol := range hub.clients[conn].Symbols {
 		hub.symbolLock.Lock()
@@ -165,6 +181,7 @@ func (hub *Hub) RemoveSymbols(conn *websocket.Conn) {
 
 }
 
+// SendToAll computes/reuses PCC payloads and fan-outs messages to each connected client.
 func (hub *Hub) SendToAll(sampledData map[string][]float64) {
 	// hub.mu.Lock()
 	// defer hub.mu.Unlock()
@@ -192,6 +209,7 @@ func (hub *Hub) SendToAll(sampledData map[string][]float64) {
 				continue
 			}
 			// responses[key], _ = json.Marshal(client.PCCMatrix)
+			// Copy bytes so pooled buffer reuse cannot mutate data already queued for clients.
 			jsonData = append([]byte(nil), buf.Bytes()...)
 			responses[key] = jsonData
 			bufferPool.Put(buf) // Return buffer to pool
@@ -207,6 +225,7 @@ func (hub *Hub) SendToAll(sampledData map[string][]float64) {
 
 }
 
+// writePump serializes outbound websocket writes for a single client connection.
 func (c *Client) writePump(hub *Hub) {
 	defer func() {
 		select {

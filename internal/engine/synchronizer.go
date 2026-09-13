@@ -5,8 +5,10 @@ import (
 	"sync"
 )
 
+// slidingWindowSize documents the intended default retention depth for price history.
 const slidingWindowSize = 600
 
+// Synchronizer wires the updater and sampler goroutines that keep symbol data current.
 func Synchronizer(symbols map[string]*models.SymbolAttributes, dataStream <-chan []byte, sampledDataChan chan map[string][]float64, symbolLock *sync.Mutex) {
 
 	go PriceUpdater(symbols, dataStream, symbolLock)
