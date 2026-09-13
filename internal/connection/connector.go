@@ -8,16 +8,19 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// Connection stores websocket dial context for one upstream exchange stream.
 type Connection struct {
 	conn     *websocket.Conn
 	endpoint string
 }
 
+// MessageResponse wraps one raw websocket payload and its read status.
 type MessageResponse struct {
 	message []byte
 	err     error
 }
 
+// Connector streams Binance ticker updates and forwards them through dataChan.
 func Connector(symbols []string, dataChan chan<- []byte, closeChan chan bool) {
 
 	slog.Info("Connecting to Binance for symbols: %v", symbols)
@@ -31,8 +34,10 @@ func Connector(symbols []string, dataChan chan<- []byte, closeChan chan bool) {
 	}
 	defer conn.conn.Close()
 
+	// Trip after 9 failed reads; require 20 successes while half-open to close again.
 	cb := CircuitBreaker{Closed, 9, 20, 0, 0, true}
 
+	// Internal queue decouples blocking websocket reads from downstream processing.
 	internalMsgChan := make(chan MessageResponse, 100)
 
 	// Loop to have non-blocking read from connection
@@ -67,9 +72,11 @@ func Connector(symbols []string, dataChan chan<- []byte, closeChan chan bool) {
 					cb.incrementSuccesses()
 				}
 			} else {
+				// Backoff bounds are in milliseconds.
 				maxWait := 60000
 				baseWait := 1000
 				for baseWait > 0 {
+					// Add jitter so reconnect attempts across symbols do not synchronize.
 					waitTime := rand.Float64() * float64(baseWait)
 					time.Sleep(time.Duration(waitTime) * time.Millisecond)
 					dialErr = conn.dial()

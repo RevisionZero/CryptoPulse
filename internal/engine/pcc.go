@@ -4,6 +4,8 @@ import (
 	"math"
 )
 
+// PCC computes the Pearson correlation coefficient between two equal-length series.
+// sampleSize is retained for compatibility with existing call sites.
 func PCC(x []float64, y []float64, sampleSize int) float64 {
 
 	sumOfProducts := 0.0
@@ -33,6 +35,7 @@ func PCC(x []float64, y []float64, sampleSize int) float64 {
 	return result
 }
 
+// CalculatePCCMatrix updates in-place correlation values for all requested symbol pairs.
 func CalculatePCCMatrix(sampledData map[string][]float64, symbols []string, pccMatrix map[string]map[string]float64) {
 
 	for _, symbolX := range symbols {

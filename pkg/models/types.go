@@ -18,6 +18,7 @@ type BinanceTicker struct {
 	EventTime int64  `json:"E"`
 }
 
+// SymbolAttributes stores mutable per-symbol backend state shared by hub/engine workers.
 type SymbolAttributes struct {
 	LatestPrice   float64
 	SlidingWindow *utils.RingBuffer

@@ -8,6 +8,7 @@ import (
 	"sync"
 )
 
+// PriceUpdater parses exchange payloads and refreshes latest midpoint prices per symbol.
 func PriceUpdater(symbols map[string]*models.SymbolAttributes, dataStream <-chan []byte, symbolLock *sync.Mutex) {
 
 	for {
@@ -21,6 +22,7 @@ func PriceUpdater(symbols map[string]*models.SymbolAttributes, dataStream <-chan
 			continue
 		}
 
+		// 64 selects float64 precision to match price storage in SymbolAttributes.
 		bid, err := strconv.ParseFloat(envelope.Data.BestBid, 64)
 		if err != nil {
 			slog.Info("Error parsing bid: %v", err)
@@ -35,6 +37,7 @@ func PriceUpdater(symbols map[string]*models.SymbolAttributes, dataStream <-chan
 
 		symbolLock.Lock()
 		if sym, ok := symbols[envelope.Data.Symbol]; ok && sym != nil {
+			// Mid-price provides a stable single representative value from best bid/ask.
 			sym.LatestPrice = (bid + ask) / 2
 		} else {
 			slog.Info("Symbol not found or nil in symbols map: %s", envelope.Data.Symbol)
