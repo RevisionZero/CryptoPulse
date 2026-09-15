@@ -13,14 +13,15 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
 
 type Client struct {
 	ID        *websocket.Conn
-	Symbols   []string    // The coins they currently want
-	Send      chan []byte // Channel to push data to this specific client
+	Symbols   []string          // The coins they currently want
+	Send      chan models.Frame // Channel to push data to this specific client
 	Conn      bool
 	PCCMatrix map[string]map[string]float64
 }
@@ -30,15 +31,26 @@ type SymbolRequest struct {
 	Symbols []string
 }
 
+type LatencyObserver interface {
+	Observe(float64)
+}
+
+// nopObserver is the default when no observer is injected, so call sites
+// never have to nil-check.
+type nopObserver struct{}
+
+func (nopObserver) Observe(float64) {}
+
 type Hub struct {
-	clients    map[*websocket.Conn]*Client
-	symbols    map[string]*models.SymbolAttributes
-	symbolLock sync.Mutex
-	Connect    chan *websocket.Conn
-	Disconnect chan *websocket.Conn
-	symbolReqs chan SymbolRequest
-	broadcast  chan map[string][]float64
-	Tracker    *tracker.Tracker
+	clients         map[*websocket.Conn]*Client
+	symbols         map[string]*models.SymbolAttributes
+	symbolLock      sync.Mutex
+	Connect         chan *websocket.Conn
+	Disconnect      chan *websocket.Conn
+	symbolReqs      chan SymbolRequest
+	broadcast       chan models.Sample
+	Tracker         *tracker.Tracker
+	latencyObserver LatencyObserver
 }
 
 var bufferPool = sync.Pool{
@@ -48,15 +60,19 @@ var bufferPool = sync.Pool{
 	},
 }
 
-func NewHub(broadcast chan map[string][]float64, t *tracker.Tracker) *Hub {
+func NewHub(broadcast chan models.Sample, t *tracker.Tracker, latencyObserver LatencyObserver) *Hub {
+	if latencyObserver == nil {
+		latencyObserver = nopObserver{}
+	}
 	return &Hub{
-		clients:    make(map[*websocket.Conn]*Client),
-		symbols:    make(map[string]*models.SymbolAttributes),
-		broadcast:  broadcast,
-		Connect:    make(chan *websocket.Conn, 64),
-		Disconnect: make(chan *websocket.Conn, 128),
-		symbolReqs: make(chan SymbolRequest, 64),
-		Tracker:    t,
+		clients:         make(map[*websocket.Conn]*Client),
+		symbols:         make(map[string]*models.SymbolAttributes),
+		broadcast:       broadcast,
+		Connect:         make(chan *websocket.Conn, 64),
+		Disconnect:      make(chan *websocket.Conn, 128),
+		symbolReqs:      make(chan SymbolRequest, 64),
+		Tracker:         t,
+		latencyObserver: latencyObserver,
 	}
 }
 
@@ -134,7 +150,7 @@ func (hub *Hub) AddClient(conn *websocket.Conn) {
 	hub.clients[conn] = &Client{
 		ID:        conn,
 		Symbols:   []string{},
-		Send:      make(chan []byte, 30),
+		Send:      make(chan models.Frame, 30),
 		Conn:      true,
 		PCCMatrix: make(map[string]map[string]float64, 0),
 	}
@@ -168,7 +184,7 @@ func (hub *Hub) RemoveSymbols(conn *websocket.Conn) {
 
 }
 
-func (hub *Hub) SendToAll(sampledData map[string][]float64) {
+func (hub *Hub) SendToAll(sample models.Sample) {
 	// hub.mu.Lock()
 	// defer hub.mu.Unlock()
 
@@ -186,7 +202,7 @@ func (hub *Hub) SendToAll(sampledData map[string][]float64) {
 			// 1. Get a buffer from the pool
 			buf := bufferPool.Get().(*bytes.Buffer)
 			buf.Reset() // CRITICAL: Clear any data from previous use
-			engine.CalculatePCCMatrix(sampledData, client.Symbols, client.PCCMatrix)
+			engine.CalculatePCCMatrix(sample.Data, client.Symbols, client.PCCMatrix)
 			jsonErr := json.NewEncoder(buf).Encode(client.PCCMatrix)
 
 			if jsonErr != nil {
@@ -200,11 +216,11 @@ func (hub *Hub) SendToAll(sampledData map[string][]float64) {
 			bufferPool.Put(buf) // Return buffer to pool
 		}
 		select {
-		case client.Send <- jsonData:
+		case client.Send <- models.Frame{Payload: jsonData, StartTime: sample.StartTime}:
 			// Message sent successfully
 		default:
 			// Skip if buffer is full or channel is closed to keep Hub fast
-			slog.Info("Skipping slow client:")
+			slog.Info("Skipping slow client:", "addr", client.ID.RemoteAddr())
 		}
 	}
 
@@ -222,7 +238,7 @@ func (c *Client) writePump(hub *Hub) {
 
 	for {
 		select {
-		case message, ok := <-c.Send:
+		case frame, ok := <-c.Send:
 			if !ok {
 				// The Hub closed the channel, send a close message to client
 				c.ID.WriteMessage(websocket.CloseMessage, []byte{})
@@ -230,11 +246,12 @@ func (c *Client) writePump(hub *Hub) {
 			}
 
 			// Perform the actual network write
-			err := c.ID.WriteMessage(websocket.TextMessage, message)
+			err := c.ID.WriteMessage(websocket.TextMessage, frame.Payload)
 			if err != nil {
 				slog.Info("Write error for client %v: %v", c.ID.RemoteAddr(), err)
 				return
 			}
+			hub.latencyObserver.Observe(time.Since(frame.StartTime).Seconds())
 		}
 	}
 }

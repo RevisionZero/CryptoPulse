@@ -4,12 +4,16 @@ import (
 	"encoding/json"
 	"log/slog"
 	"main/internal/hub"
+	"main/pkg/models"
 	"main/pkg/tracker"
 	"net/http"
 	"os"
 	"os/signal"
 
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -31,9 +35,39 @@ func main() {
 	}
 	t := tracker.New(dataFilePath)
 
-	broadcast := make(chan map[string][]float64, 256)
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(
+		collectors.NewGoCollector(),
+		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
+	)
 
-	h := hub.NewHub(broadcast, t)
+	latencyHistogram := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    "latency_timings",
+		Help:    "The timing measurements from a sampling tick until sending data to a client.",
+		Unit:    "second",
+		Buckets: prometheus.LinearBuckets(0.1, 0.1, 5),
+	})
+
+	metricsAddr := os.Getenv("METRICS_ADDR")
+	if metricsAddr == "" {
+		metricsAddr = "127.0.0.1:2112"
+	}
+
+	// Metrics get their own mux and listener. Registering on the default mux
+	// would also expose /metrics on the public :8080 listener below.
+	go func() {
+		metricsMux := http.NewServeMux()
+		metricsMux.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{Registry: reg}))
+		slog.Info("Metrics server starting", "addr", metricsAddr)
+		if err := http.ListenAndServe(metricsAddr, metricsMux); err != nil {
+			// Non-fatal: losing metrics should not take the engine down.
+			slog.Info("Metrics server error", "err", err)
+		}
+	}()
+
+	broadcast := make(chan models.Sample, 256)
+
+	h := hub.NewHub(broadcast, t, latencyHistogram)
 
 	statsToken := os.Getenv("STATS_TOKEN")
 	http.HandleFunc("/ws", h.WSHandler)

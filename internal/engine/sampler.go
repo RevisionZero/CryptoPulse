@@ -8,14 +8,14 @@ import (
 
 const samplingPeriod = 100 * time.Millisecond
 
-func Sampler(symbols map[string]*models.SymbolAttributes, symbolLock *sync.Mutex, sampledDataChan chan<- map[string][]float64) {
+func Sampler(symbols map[string]*models.SymbolAttributes, symbolLock *sync.Mutex, sampledDataChan chan<- models.Sample) {
 	ticker := time.NewTicker(samplingPeriod)
 	defer ticker.Stop()
 
 	// sample := make(map[string]float64)
 	sampledData := make(map[string][]float64)
 
-	for range ticker.C {
+	for tickTime := range ticker.C {
 
 		symbolLock.Lock()
 		for symbol, symbolAttr := range symbols {
@@ -23,8 +23,7 @@ func Sampler(symbols map[string]*models.SymbolAttributes, symbolLock *sync.Mutex
 			sampledData[symbol] = symbolAttr.SlidingWindow.GetAll()
 		}
 		symbolLock.Unlock()
-
-		sampledDataChan <- sampledData
+		sampledDataChan <- models.Sample{Data: sampledData, StartTime: tickTime}
 
 	}
 }
